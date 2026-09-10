@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beam - send a file to your phone</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root {
+    --bg: #eef1ee;
+    --panel: #ffffff;
+    --ink: #17232e;
+    --muted: #66737e;
+    --line: #cfd6d2;
+    --go: #2b6b4e;
+    --go-soft: #dcefe4;
+    --warn: #9a3b2c;
+    --warn-soft: #f6e3de;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body {
+    font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  main {
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 40px 20px 64px;
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0 0 4px;
+  }
+  .lede {
+    color: var(--muted);
+    margin: 0 0 28px;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+  .qr-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  #qr {
+    width: 232px;
+    height: 232px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    background: #fff;
+  }
+  #qr img, #qr canvas { display: block; }
+  .placeholder {
+    width: 220px;
+    height: 220px;
+    border: 2px dashed var(--line);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .status {
+    margin: 16px 0 0;
+    font-weight: 500;
+  }
+  .status.go { color: var(--go); }
+  .status.warn { color: var(--warn); }
+  .link {
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--muted);
+    word-break: break-all;
+    user-select: all;
+  }
+  .row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+    justify-content: center;
+  }
+  button, .btn {
+    font: inherit;
+    font-size: 15px;
+    padding: 9px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink);
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+  }
+  button:hover, .btn:hover { border-color: var(--ink); }
+  button:focus-visible, .btn:focus-visible, .drop:focus-visible {
+    outline: 3px solid var(--go);
+    outline-offset: 2px;
+  }
+  .primary { background: var(--go); border-color: var(--go); color: #fff; }
+  .primary:hover { background: #235a41; }
+  .drop {
+    border: 2px dashed var(--line);
+    border-radius: 12px;
+    padding: 28px 20px;
+    text-align: center;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background 120ms, border-color 120ms;
+  }
+  .drop.over { background: var(--go-soft); border-color: var(--go); color: var(--go); }
+  .drop strong { color: var(--ink); font-weight: 500; }
+  input[type="file"] { display: none; }
+  ul.files { list-style: none; margin: 16px 0 0; padding: 0; }
+  ul.files li {
+    padding: 12px 0;
+    border-top: 1px solid var(--line);
+  }
+  ul.files li:first-child { border-top: 0; padding-top: 0; }
+  .fname {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: baseline;
+  }
+  .fname span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .fsize { color: var(--muted); font-size: 14px; flex-shrink: 0; }
+  .bar {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--line);
+    margin-top: 8px;
+    overflow: hidden;
+  }
+  .bar i {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: var(--go);
+    transition: width 120ms linear;
+  }
+  .fstate { font-size: 14px; color: var(--muted); margin-top: 6px; }
+  .fstate.go { color: var(--go); }
+  .fstate.warn { color: var(--warn); }
+  .actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .note {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 16px;
+  }
+  .hidden { display: none !important; }
+  @media (prefers-reduced-motion: reduce) {
+    .bar i, .drop { transition: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Beam</h1>
+  <p class="lede" id="lede">Send a file from this computer to your phone.</p>
+
+  <!-- Sender view -->
+  <section id="sender" class="hidden">
+    <div class="panel qr-wrap">
+      <div id="qr"><div class="placeholder">Making your code</div></div>
+      <p class="status" id="s-status">Connecting</p>
+      <div class="link" id="s-link"></div>
+      <div class="row">
+        <button type="button" id="copy">Copy link</button>
+        <button type="button" id="newcode">New code</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose files to send">
+        <strong>Drop files here</strong> or click to choose
+      </div>
+      <input type="file" id="picker" multiple>
+      <ul class="files" id="s-files"></ul>
+      <p class="note">Files go straight from this browser to the phone. Nothing is uploaded to a server. Keep this tab open until the transfer finishes.</p>
+    </div>
+  </section>
+
+  <!-- Receiver view -->
+  <section id="receiver" class="hidden">
+    <div class="panel">
+      <p class="status" id="r-status" style="margin-top:0">Connecting to the computer</p>
+      <ul class="files" id="r-files"></ul>
+      <p class="note" id="r-note">Files appear here as they arrive. Tap Save to keep one.</p>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  var CHUNK = 32 * 1024;            // bytes per data-channel message
+  var HIGH_WATER = 4 * 1024 * 1024; // pause sending when this much is buffered
+
+  var $ = function (id) { return document.getElementById(id); };
+  var peer = null;
+  var conn = null;
+
+  function fmtBytes(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+    if (n < 1073741824) return (n / 1048576).toFixed(1) + ' MB';
+    return (n / 1073741824).toFixed(2) + ' GB';
+  }
+
+  function randomId() {
+    var chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+    var out = '';
+    var buf = new Uint8Array(10);
+    crypto.getRandomValues(buf);
+    for (var i = 0; i < buf.length; i++) out += chars[buf[i] % chars.length];
+    return out;
+  }
+
+  function setStatus(el, text, cls) {
+    el.textContent = text;
+    el.className = 'status' + (cls ? ' ' + cls : '');
+  }
+
+  function fileRow(list, name, size) {
+    var li = document.createElement('li');
+    li.innerHTML =
+      '<div class="fname"><span></span><span class="fsize"></span></div>' +
+      '<div class="bar"><i></i></div>' +
+      '<div class="fstate"></div>' +
+      '<div class="actions"></div>';
+    li.querySelector('.fname span').textContent = name;
+    li.querySelector('.fsize').textContent = fmtBytes(size);
+    list.appendChild(li);
+    return {
+      li: li,
+      bar: li.querySelector('.bar i'),
+      state: li.querySelector('.fstate'),
+      actions: li.querySelector('.actions'),
+      setProgress: function (done, total) {
+        this.bar.style.width = (total ? Math.round(done / total * 100) : 0) + '%';
+      },
+      setState: function (text, cls) {
+        this.state.textContent = text;
+        this.state.className = 'fstate' + (cls ? ' ' + cls : '');
+      }
+    };
+  }
+
+  // ---------------------------------------------------------------
+  // Sender (desktop)
+  // ---------------------------------------------------------------
+  var queue = [];
+  var sending = false;
+
+  function startSender() {
+    $('sender').classList.remove('hidden');
+    var id = randomId();
+
+    if (peer) peer.destroy();
+    conn = null;
+    $('qr').innerHTML = '<div class="placeholder">Making your code</div>';
+    $('s-link').textContent = '';
+    setStatus($('s-status'), 'Connecting');
+
+    peer = new Peer(id, { debug: 1 });
+
+    peer.on('open', function () {
+      var url = location.origin + location.pathname + '#' + id;
+      $('qr').innerHTML = '';
+      new QRCode($('qr'), {
+        text: url,
+        width: 220,
+        height: 220,
+        colorDark: '#17232e',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+      $('s-link').textContent = url;
+      setStatus($('s-status'), 'Scan this with your phone camera');
+    });
+
+    peer.on('connection', function (c) {
+      if (conn && conn.open) conn.close();
+      conn = c;
+      conn.on('open', function () {
+        setStatus($('s-status'), 'Phone connected', 'go');
+        flushQueue();
+      });
+      conn.on('data', function (d) {
+        try {
+          var msg = JSON.parse(d);
+          if (msg.type === 'ack' && msg.row) {
+            var row = rowsByKey[msg.row];
+            if (row) row.setState('Delivered', 'go');
+          }
+        } catch (e) { /* ignore */ }
+      });
+      conn.on('close', function () {
+        setStatus($('s-status'), 'Phone disconnected. Scan again to reconnect.', 'warn');
+        sending = false;
+      });
+      conn.on('error', function () {
+        setStatus($('s-status'), 'Connection error. Try a new code.', 'warn');
+      });
+    });
+
+    peer.on('disconnected', function () {
+      if (peer && !peer.destroyed) peer.reconnect();
+    });
+
+    peer.on('error', function (e) {
+      if (e.type === 'unavailable-id') { startSender(); return; }
+      setStatus($('s-status'), 'Could not reach the signaling server (' + e.type + '). Check your connection and try a new code.', 'warn');
+    });
+  }
+
+  var rowsByKey = {};
+  var rowCounter = 0;
+
+  function addFiles(fileList) {
+    for (var i = 0; i < fileList.length; i++) {
+      var f = fileList[i];
+      var key = 'f' + (++rowCounter);
+      var row = fileRow($('s-files'), f.name, f.size);
+      row.setState('Waiting for phone');
+      rowsByKey[key] = row;
+      queue.push({ file: f, row: row, key: key });
+    }
+    flushQueue();
+  }
+
+  function flushQueue() {
+    if (sending || !conn || !conn.open || queue.length === 0) return;
+    sending = true;
+    var item = queue.shift();
+    sendFile(item, function (err) {
+      sending = false;
+      if (err) {
+        item.row.setState('Failed: ' + err.message, 'warn');
+        queue.unshift(item);
+        return;
+      }
+      item.row.setState('Sent, waiting for phone to confirm');
+      flushQueue();
+    });
+  }
+
+  function sendFile(item, cb) {
+    var file = item.file;
+    var row = item.row;
+    var dc = conn.dataChannel;
+    var offset = 0;
+
+    row.setState('Sending');
+    conn.send(JSON.stringify({
+      type: 'meta',
+      row: item.key,
+      name: file.name,
+      size: file.size,
+      mime: file.type
+    }));
+
+    function pump() {
+      if (!conn || !conn.open) { cb(new Error('phone disconnected')); return; }
+      if (dc && dc.bufferedAmount > HIGH_WATER) { setTimeout(pump, 40); return; }
+      if (offset >= file.size) {
+        conn.send(JSON.stringify({ type: 'end', row: item.key }));
+        row.setProgress(1, 1);
+        cb(null);
+        return;
+      }
+      file.slice(offset, offset + CHUNK).arrayBuffer().then(function (buf) {
+        conn.send(buf);
+        offset += buf.byteLength;
+        row.setProgress(offset, file.size);
+        pump();
+      }, cb);
+    }
+    pump();
+  }
+
+  // ---------------------------------------------------------------
+  // Receiver (phone)
+  // ---------------------------------------------------------------
+  var incoming = null;
+
+  function startReceiver(targetId) {
+    $('receiver').classList.remove('hidden');
+    $('lede').textContent = 'Receiving files from the computer.';
+
+    peer = new Peer(undefined, { debug: 1 });
+
+    peer.on('open', function () {
+      conn = peer.connect(targetId, { reliable: true, serialization: 'raw' });
+      conn.on('open', function () {
+        setStatus($('r-status'), 'Connected. Waiting for files.', 'go');
+      });
+      conn.on('data', onReceiverData);
+      conn.on('close', function () {
+        setStatus($('r-status'), 'The computer disconnected.', 'warn');
+      });
+      conn.on('error', function () {
+        setStatus($('r-status'), 'Connection error. Scan the code again.', 'warn');
+      });
+    });
+
+    peer.on('error', function (e) {
+      if (e.type === 'peer-unavailable') {
+        setStatus($('r-status'), 'This code has expired. Ask the computer to show a new one and scan again.', 'warn');
+      } else {
+        setStatus($('r-status'), 'Could not connect (' + e.type + ').', 'warn');
+      }
+    });
+  }
+
+  function onReceiverData(d) {
+    if (typeof d === 'string') {
+      var msg;
+      try { msg = JSON.parse(d); } catch (e) { return; }
+      if (msg.type === 'meta') {
+        incoming = {
+          key: msg.row,
+          name: msg.name,
+          size: msg.size,
+          mime: msg.mime,
+          parts: [],
+          received: 0,
+          row: fileRow($('r-files'), msg.name, msg.size)
+        };
+        incoming.row.setState('Receiving');
+        setStatus($('r-status'), 'Receiving ' + msg.name, 'go');
+      } else if (msg.type === 'end' && incoming) {
+        finishIncoming();
+      }
+      return;
+    }
+    if (!incoming) return;
+    var buf = d instanceof ArrayBuffer ? d : (d.buffer ? d.buffer : null);
+    if (!buf) return;
+    incoming.parts.push(buf);
+    incoming.received += buf.byteLength;
+    incoming.row.setProgress(incoming.received, incoming.size);
+  }
+
+  function finishIncoming() {
+    var f = incoming;
+    incoming = null;
+    var blob = new Blob(f.parts, { type: f.mime || 'application/octet-stream' });
+    var url = URL.createObjectURL(blob);
+    f.row.setProgress(1, 1);
+    f.row.setState('Received', 'go');
+
+    var a = document.createElement('a');
+    a.className = 'btn primary';
+    a.href = url;
+    a.download = f.name;
+    a.textContent = 'Save';
+    f.row.actions.appendChild(a);
+
+    var shareFile = null;
+    try { shareFile = new File([blob], f.name, { type: blob.type }); } catch (e) { /* older browser */ }
+    if (shareFile && navigator.canShare && navigator.canShare({ files: [shareFile] })) {
+      var s = document.createElement('button');
+      s.type = 'button';
+      s.textContent = 'Share';
+      s.addEventListener('click', function () {
+        navigator.share({ files: [shareFile], title: f.name }).catch(function () {});
+      });
+      f.row.actions.appendChild(s);
+    }
+
+    setStatus($('r-status'), 'Connected. Waiting for files.', 'go');
+    if (conn && conn.open) conn.send(JSON.stringify({ type: 'ack', row: f.key }));
+  }
+
+  // ---------------------------------------------------------------
+  // Wiring
+  // ---------------------------------------------------------------
+  var hash = location.hash.replace(/^#/, '');
+  if (/^[a-z0-9]{10}$/.test(hash)) {
+    startReceiver(hash);
+  } else {
+    startSender();
+
+    var drop = $('drop');
+    var picker = $('picker');
+    drop.addEventListener('click', function () { picker.click(); });
+    drop.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); picker.click(); }
+    });
+    picker.addEventListener('change', function () {
+      addFiles(picker.files);
+      picker.value = '';
+    });
+    ['dragenter', 'dragover'].forEach(function (ev) {
+      drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); });
+    });
+    ['dragleave', 'drop'].forEach(function (ev) {
+      drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); });
+    });
+    drop.addEventListener('drop', function (e) {
+      if (e.dataTransfer && e.dataTransfer.files) addFiles(e.dataTransfer.files);
+    });
+
+    $('copy').addEventListener('click', function () {
+      var text = $('s-link').textContent;
+      if (!text) return;
+      navigator.clipboard.writeText(text).then(function () {
+        $('copy').textContent = 'Copied';
+        setTimeout(function () { $('copy').textContent = 'Copy link'; }, 1500);
+      });
+    });
+    $('newcode').addEventListener('click', function () { startSender(); });
+  }
+
+  window.addEventListener('beforeunload', function () {
+    if (peer) peer.destroy();
+  });
+})();
+</script>
+</body>
+</html>
