@@ -53,9 +53,18 @@
     vals = new Float32Array(cols * rows);
   }
 
+  var summit = false, speed = 1;
   function color() {
     var c = getComputedStyle(document.documentElement).getPropertyValue('--topo').trim();
     return c || 'rgba(31,122,85,0.16)';
+  }
+  // Hypsometric tint for summit mode: low ground green, up through ochre to snow.
+  function tint(i, n) {
+    var t = i / (n - 1);
+    var dark = getComputedStyle(document.documentElement).colorScheme === 'dark';
+    var h = 140 - t * 140, sat = 70 - t * 25;
+    var light = dark ? 42 + t * 42 : 30 + t * 22;
+    return 'hsla(' + h + ', ' + sat + '%, ' + light + '%, ' + (dark ? 0.55 : 0.5) + ')';
   }
 
   var LEVELS = [];
@@ -72,9 +81,9 @@
       var lv = LEVELS[i];
       var index = (i % 4 === 0);
       ctx.beginPath();
-      ctx.lineWidth = index ? 1.4 : 0.8;
-      ctx.strokeStyle = stroke;
-      ctx.globalAlpha = index ? 1 : 0.6;
+      ctx.lineWidth = index ? (summit ? 2 : 1.4) : (summit ? 1.1 : 0.8);
+      ctx.strokeStyle = summit ? tint(i, LEVELS.length) : stroke;
+      ctx.globalAlpha = index ? 1 : (summit ? 0.85 : 0.6);
       for (y = 0; y < rows - 1; y++) {
         for (x = 0; x < cols - 1; x++) {
           var a = vals[y * cols + x], b = vals[y * cols + x + 1], c = vals[(y + 1) * cols + x + 1], d = vals[(y + 1) * cols + x];
@@ -105,10 +114,10 @@
   function frac(v1, v2, lv) { var d = v2 - v1; return d === 0 ? 0.5 : Math.min(1, Math.max(0, (lv - v1) / d)); }
   function seg(p, q) { ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); }
 
-  var start = performance.now(), last = 0, running = true;
+  var start = performance.now(), last = 0, running = true, phase = 0;
   function frame(now) {
     if (!running) return;
-    if (now - last > 90) { last = now; draw((now - start) / 1000); }
+    if (now - last > 90) { if (last) phase += Math.min(0.5, (now - last) / 1000) * speed; last = now; draw(phase); }
     requestAnimationFrame(frame);
   }
   function startLoop() { if (running) return; running = true; last = 0; requestAnimationFrame(frame); }
@@ -117,16 +126,26 @@
   resize();
   draw(0);
   var resizeTimer = null;
-  window.addEventListener('resize', function () { clearTimeout(resizeTimer); resizeTimer = setTimeout(function () { resize(); draw(reduce ? 0 : (performance.now() - start) / 1000); }, 120); });
+  window.addEventListener('resize', function () { clearTimeout(resizeTimer); resizeTimer = setTimeout(function () { resize(); draw(phase); }, 120); });
   if (!reduce) {
     requestAnimationFrame(frame);
     document.addEventListener('visibilitychange', function () { if (document.hidden) stopLoop(); else startLoop(); });
   }
+  window.BeamTopo = {
+    toggleSummit: function () {
+      summit = !summit; speed = summit ? 4 : 1;
+      if (summit && !running && !reduce) startLoop();
+      draw(phase);
+      return summit;
+    },
+    isSummit: function () { return summit; }
+  };
+
   // Redraw when the theme changes so the line colour follows it.
-  new MutationObserver(function () { draw((performance.now() - start) / 1000); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  new MutationObserver(function () { draw(phase); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   if (window.matchMedia) {
     var mq = window.matchMedia('(prefers-color-scheme: dark)');
-    var re = function () { draw((performance.now() - start) / 1000); };
+    var re = function () { draw(phase); };
     if (mq.addEventListener) mq.addEventListener('change', re); else if (mq.addListener) mq.addListener(re);
   }
 })();

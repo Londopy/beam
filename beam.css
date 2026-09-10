@@ -366,6 +366,21 @@ ul.checks { list-style: none; margin: 12px 0 0; padding: 0; }
 .radio-cards input { position: absolute; opacity: 0; }
 .radio-cards svg { width: 20px; height: 20px; }
 .radio-cards label:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 2px; }
+/* Offline pairing */
+#direct-qr { width: 276px; height: 276px; display: flex; align-items: center; justify-content: center; padding: 8px; background: #fff; border-radius: 12px; border: 1px solid var(--line); cursor: zoom-in; }
+#direct-qr img, #direct-qr canvas { display: block; }
+#direct details summary::-webkit-details-marker { display: none; }
+#direct details summary { list-style: none; }
+#direct details summary::before { content: "+ "; color: var(--go); font-weight: 700; }
+#direct details[open] summary::before { content: "- "; }
+#direct-code-out, #direct-code-in { font-size: 11.5px; word-break: break-all; }
+
+/* Summit mode (easter egg) */
+body.summit .brand .mark { animation: spin 1.6s cubic-bezier(0.6, 0, 0.3, 1) 1; background: linear-gradient(135deg, #1f7a55, #d39b2a 60%, #f4f1ea); }
+@keyframes spin { from { transform: rotate(0) scale(1); } 50% { transform: rotate(180deg) scale(1.25); } to { transform: rotate(360deg) scale(1); } }
+body.summit #topo { mask-image: none; -webkit-mask-image: none; }
+body.summit .panel { background: color-mix(in srgb, var(--panel-glass) 82%, transparent); }
+
 /* QR scanner */
 .scanner { margin-top: 14px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .viewfinder {

@@ -23,6 +23,10 @@ Connecting
 typing the code, pasting the link, or scanning the QR with the camera right
 on the page (any browser with camera access; uses the native detector where
 available and jsQR elsewhere).
+* Offline pairing: no signaling server and no internet at all. The host shows
+its WebRTC offer as a QR, the guest scans it and shows a reply QR, the host
+scans that. Two scans, then a direct link on any shared Wi-Fi or hotspot.
+Codes can also be copied as text for devices without a camera.
 * Several devices can join the same room. The host can send to one device or
 to everyone.
 * Optional PIN to join (shown next to the QR, never included in the link),
@@ -32,7 +36,10 @@ device name you can edit.
 printed or bookmarked link keeps working. New code rotates it.
 * Tap the QR to enlarge it, tap the code to copy it, Share link on phones.
 * Each connected device shows whether the link is direct, on the same
-network, or going through a TURN relay.
+network, or going through a TURN relay, plus a Ping button for round-trip
+time. Save QR downloads the room code as a PNG to print or share.
+* Installed on Android, Beam appears in the system share sheet: share a photo
+or a link from any app straight into a room.
 
 Sending
 
@@ -90,11 +97,21 @@ so Pages serves the files as-is.
 The site must be served over HTTPS (Pages does this) because the camera,
 clipboard, and File System Access APIs require a secure context.
 
+## Is there an easter egg?
+
+Maybe. Climbers know the code: up, up, down, down, left, right, left, right,
+B, A. Or tap the logo seven times.
+
 ## How it works
 
 * `index.html` loads PeerJS (WebRTC wrapper), qrcode.js (QR rendering), and
 JSZip (Save all as zip) from cdnjs, and jsQR (QR scanning fallback) from
-jsDelivr. `topo.js` draws the drifting contour-line background on a canvas. `common.js` holds the
+jsDelivr. `topo.js` draws the drifting contour-line background on a canvas.
+`direct.js` is the offline pairing: it squeezes a data-channel SDP down to
+the ICE credentials, fingerprint, and candidates (about 250 characters),
+rebuilds the boilerplate on the other side, and wraps the raw
+RTCPeerConnection so the rest of the app cannot tell it from a PeerJS
+connection. `common.js` holds the
 settings storage and theme code shared with `settings.html`; `beam.css` is
 the shared stylesheet.
 * The host creates a PeerJS peer with a random 10-character id and shows a
@@ -166,6 +183,7 @@ port, path, and key in Beam's Settings. A Docker image is also published as
     common.js                     settings storage and theme, shared
     beam.css                      stylesheet, shared
     topo.js                       contour-line background
+    direct.js                     offline pairing (serverless WebRTC)
     diag.js                       connection check
     og.png                        link preview image
     manifest.webmanifest, sw.js   installable app shell

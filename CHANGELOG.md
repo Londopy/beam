@@ -2,6 +2,20 @@
 
 All notable changes to Beam. Dates are when the change landed on `main`.
 
+## 1.3.0 - 2026-09-10
+
+Added
+- Offline pairing: connect with no signaling server and no internet. Host
+  shows an offer QR, guest scans it and shows a reply QR, host scans that.
+  Codes are about 250 characters and can be pasted as text. Works even when
+  the PeerJS library fails to load.
+- Ping button on each connected device showing round-trip time; guests see it
+  in the footer.
+- Save QR: downloads the room QR, code, PIN, and link as a PNG.
+- Android share target: share files or links from any app into the installed
+  Beam and they land in the Send queue.
+- A hidden summit mode. Climbers know the code.
+
 ## 1.2.1 - 2026-09-10
 
 Added

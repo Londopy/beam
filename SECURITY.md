@@ -23,6 +23,12 @@ Things to know:
   (jsQR). If you want to remove that trust dependency, download the scripts
   into the repository and change the `<script src>` tags to local paths.
 - The service worker caches only Beam's own files, never transferred data.
+  Files shared into the app from the Android share sheet are parked in a
+  local cache until the page picks them up, then deleted.
+- Offline pairing codes contain the ICE credentials and DTLS fingerprint for
+  one connection. They are single-use and expire as soon as the pairing
+  completes or the page is closed, but treat them like a room link while the
+  QR is on screen.
 
 To report a vulnerability, open a GitHub issue with the label `security`, or
 if it is sensitive, use the repository's private vulnerability reporting

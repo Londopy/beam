@@ -30,6 +30,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" defer></script>
+<script src="direct.js"></script>
 </head>
 <body>
 <canvas id="topo" aria-hidden="true"></canvas>
@@ -66,6 +67,8 @@
       <button type="button" id="share-link" class="hidden">Share link</button>
       <button type="button" id="new-code">New code</button>
       <button type="button" id="lock-room">Lock room</button>
+      <button type="button" id="save-qr">Save QR</button>
+      <button type="button" id="direct-host-btn" title="Pair with no internet and no server">Offline pairing</button>
     </div>
     <div id="devices" class="hidden" style="width:100%;margin-top:18px;text-align:left">
       <h2>Connected devices</h2>
@@ -84,22 +87,9 @@
       <div class="row">
         <button type="button" class="primary" id="join-btn">Connect</button>
         <button type="button" id="scan-btn" class="hidden">Scan a QR code</button>
+        <button type="button" id="direct-guest-btn" title="Pair with no internet and no server">Offline pairing</button>
       </div>
-      <div class="scanner hidden" id="scanner">
-        <div class="viewfinder starting" id="viewfinder">
-          <video id="scan-video" playsinline muted autoplay></video>
-          <div class="mask"></div>
-          <div class="grid"></div>
-          <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
-          <div class="laser"></div>
-          <div class="hint" id="scan-hint">Point at the Beam code</div>
-        </div>
-        <div class="row">
-          <button type="button" id="flip-cam" class="small hidden">Switch camera</button>
-          <button type="button" id="torch-btn" class="small hidden">Light</button>
-          <button type="button" id="stop-scan" class="small">Stop</button>
-        </div>
-      </div>
+      <div id="scan-slot-join"></div>
     </div>
     <div id="pin-form" class="hidden">
       <label class="field"><span>This room needs a PIN. Ask the host for it.</span>
@@ -110,6 +100,41 @@
     <p class="note">Trouble connecting? <a href="settings.html#diag">Run the connection check</a> to scan for VPNs, firewalls, and blocked servers.</p>
     <div class="row" id="join-connected">
       <button type="button" id="leave-btn" class="hidden">Leave</button>
+    </div>
+  </section>
+
+  <!-- Offline pairing (no server, no internet) -->
+  <section id="direct" class="panel hidden">
+    <div class="panel-head">
+      <h2>Offline pairing</h2>
+      <button type="button" id="direct-back" class="small ghost">Back</button>
+    </div>
+    <p class="note" style="margin-top:0">Works with no internet and no server: both devices just need to be on the same Wi-Fi or hotspot. Two scans instead of one.</p>
+    <p class="status" id="direct-status"></p>
+
+    <div id="direct-show" class="hidden">
+      <h2 id="direct-show-title" style="margin-top:14px">Step 1: scan this on the other device</h2>
+      <div class="qr-wrap">
+        <div id="direct-qr" title="Tap to enlarge" role="button" tabindex="0"><div class="placeholder">Making the code</div></div>
+      </div>
+      <details style="margin-top:10px">
+        <summary class="note" style="cursor:pointer;margin:0">No camera on the other device? Copy the code as text instead</summary>
+        <textarea id="direct-code-out" class="mono" rows="3" readonly spellcheck="false" style="margin-top:8px"></textarea>
+        <div class="row tight"><button type="button" id="direct-copy" class="small">Copy code</button></div>
+      </details>
+    </div>
+
+    <div id="direct-read" class="hidden">
+      <h2 id="direct-read-title" style="margin-top:14px">Step 2: scan the other device's reply</h2>
+      <div class="row tight">
+        <button type="button" class="primary" id="direct-scan">Scan reply</button>
+      </div>
+      <details style="margin-top:10px">
+        <summary class="note" style="cursor:pointer;margin:0">Or paste the reply code</summary>
+        <textarea id="direct-code-in" class="mono" rows="3" spellcheck="false" placeholder="beam1:..." style="margin-top:8px"></textarea>
+        <div class="row tight"><button type="button" id="direct-paste-btn" class="small">Connect</button></div>
+      </details>
+      <div id="direct-scan-slot"></div>
     </div>
   </section>
 
@@ -162,6 +187,22 @@
       <button type="button" id="clear-folder" class="small hidden">Stop saving to folder</button>
     </div>
   </section>
+
+<div class="scanner hidden" id="scanner">
+  <div class="viewfinder starting" id="viewfinder">
+    <video id="scan-video" playsinline muted autoplay></video>
+    <div class="mask"></div>
+    <div class="grid"></div>
+    <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+    <div class="laser"></div>
+    <div class="hint" id="scan-hint">Point at the Beam code</div>
+  </div>
+  <div class="row">
+    <button type="button" id="flip-cam" class="small hidden">Switch camera</button>
+    <button type="button" id="torch-btn" class="small hidden">Light</button>
+    <button type="button" id="stop-scan" class="small">Stop</button>
+  </div>
+</div>
 
   <footer>
     <div class="stats" id="stats"></div>
@@ -539,6 +580,10 @@
         }
         break;
       case 'rename': link.name = String(msg.name || link.name).slice(0, 40); renderDevices(); break;
+      case 'ping': sendJson(link, { type: 'pong', t: msg.t }); break;
+      case 'pong':
+        if (typeof msg.t === 'number') { link.rtt = Math.max(0, Math.round(performance.now() - msg.t)); renderDevices(); if (mode === 'guest') $('route-note').textContent = routeLabel(link.route) + ', ' + link.rtt + ' ms'; }
+        break;
     }
   }
 
@@ -586,6 +631,7 @@
     try { history.replaceState(null, '', location.pathname); } catch (e) { /* ignore */ }
     flushUnassigned(link);
     detectRoute(link);
+    setTimeout(function () { sendJson(link, { type: 'ping', t: performance.now() }); }, 800);
     pumpLink(link);
   }
 
@@ -618,7 +664,7 @@
       var lt = l && l.candidateType, rt = r && r.candidateType;
       link.route = (lt === 'relay' || rt === 'relay') ? 'relay' : (lt === 'host' && rt === 'host') ? 'local' : 'direct';
       renderDevices();
-      if (mode === 'guest') $('route-note').textContent = routeLabel(link.route);
+      if (mode === 'guest') $('route-note').textContent = routeLabel(link.route) + (link.rtt != null ? ', ' + link.rtt + ' ms' : '');
     }).catch(function () {});
   }
   function routeLabel(route) {
@@ -1034,6 +1080,9 @@
   // -------------------------------------------------------------------
   function teardown() {
     peerGen++;
+    if (directConn) { try { directConn.close(); } catch (e) { /* ignore */ } directConn = null; }
+    directRole = null;
+    $('direct').classList.add('hidden');
     for (var k in links) { try { links[k].conn.close(); } catch (e) { /* ignore */ } }
     links = {}; guestLink = null;
     if (peer) { try { peer.destroy(); } catch (e) { /* ignore */ } }
@@ -1126,8 +1175,11 @@
       var dot = document.createElement('span'); dot.className = 'dot' + (link.route === 'relay' ? ' relay' : ''); chip.appendChild(dot);
       chip.appendChild(document.createTextNode(link.name));
       var sub = document.createElement('span'); sub.className = 'sub';
-      sub.textContent = fmtBytes(link.bytesIn + link.bytesOut) + (link.route ? ', ' + routeLabel(link.route) : '');
+      sub.textContent = fmtBytes(link.bytesIn + link.bytesOut) + (link.route ? ', ' + routeLabel(link.route) : '') + (link.rtt != null ? ', ' + link.rtt + ' ms' : '');
       chip.appendChild(sub);
+      var pb = document.createElement('button'); pb.type = 'button'; pb.textContent = 'Ping'; pb.title = 'Measure round-trip time';
+      pb.addEventListener('click', function () { sendJson(link, { type: 'ping', t: performance.now() }); });
+      chip.appendChild(pb);
       var b = document.createElement('button'); b.type = 'button'; b.textContent = 'Disconnect';
       b.addEventListener('click', function () { link.conn.close(); });
       chip.appendChild(b);
@@ -1204,17 +1256,130 @@
     });
   }
 
+  // -------------------------------------------------------------------
+  // Offline pairing: no signaling server. Host shows an offer code, guest scans it and shows a reply
+  // code, host scans that. Both sides then use the normal Beam protocol over the data channel.
+  // -------------------------------------------------------------------
+  var directConn = null, directRole = null;
+  function directStatus(text, cls) { setStatus($('direct-status'), text, cls); }
+  function showDirectQr(code) {
+    var box = $('direct-qr'); box.innerHTML = '';
+    if (!window.QRCode) { box.innerHTML = '<div class="placeholder">QR library did not load; use the text code below.</div>'; }
+    else new QRCode(box, { text: code, width: 260, height: 260, colorDark: '#17232e', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.L });
+    $('direct-code-out').value = code;
+  }
+  function openDirect(role) {
+    if (!window.BeamDirect || !window.RTCPeerConnection) { toast('Offline pairing is not available in this browser'); return; }
+    teardown();
+    directRole = role;
+    setMode(role === 'host' ? 'host' : 'guest');
+    roomId = 'direct'; roomPin = null; roomLocked = false;
+    $('room').classList.add('hidden'); $('join').classList.add('hidden');
+    $('send').classList.add('hidden'); $('recv').classList.add('hidden');
+    $('direct').classList.remove('hidden');
+    $('direct-show').classList.add('hidden'); $('direct-read').classList.add('hidden');
+    $('direct-code-in').value = '';
+    $('lede').textContent = 'Offline pairing: same Wi-Fi or hotspot, no internet needed.';
+    if (role === 'host') {
+      $('direct-show-title').textContent = 'Step 1: scan this on the other device';
+      $('direct-read-title').textContent = 'Step 2: scan the reply the other device shows';
+      $('direct-scan').textContent = 'Scan reply';
+      directStatus('Making your code', 'busy');
+      BeamDirect.makeOffer(B.parseIce(settings.ice).filter(function (e) { return /stun/.test(JSON.stringify(e.urls)); })).then(function (r) {
+        if (directRole !== 'host') { r.conn.close(); return; }
+        directConn = r.conn;
+        wireDirect(r.conn);
+        showDirectQr(r.code);
+        $('direct-show').classList.remove('hidden'); $('direct-read').classList.remove('hidden');
+        directStatus('Waiting for the reply code', 'busy');
+      }, function (e) { directStatus('Could not create a code: ' + e.message, 'warn'); });
+    } else {
+      $('direct-read-title').textContent = 'Step 1: scan the code on the host device';
+      $('direct-scan').textContent = 'Scan host code';
+      $('direct-show-title').textContent = 'Step 2: let the host scan this reply';
+      $('direct-read').classList.remove('hidden');
+      directStatus('Scan the host\'s offline code', 'busy');
+    }
+  }
+  function wireDirect(conn) {
+    conn.on('open', function () {
+      var link = makeLink(conn);
+      links[link.id] = link;
+      $('direct').classList.add('hidden');
+      $('send').classList.remove('hidden'); $('recv').classList.remove('hidden');
+      if (directRole === 'host') {
+        $('room').classList.remove('hidden');
+        $('qr').innerHTML = '<div class="placeholder">Offline pairing</div>';
+        $('room-code').textContent = ''; $('room-link').textContent = '';
+        setStatus($('room-status'), 'Offline link open, waiting for hello', 'busy');
+      } else {
+        guestLink = link;
+        $('join').classList.remove('hidden'); $('join-form').classList.add('hidden'); $('leave-btn').classList.remove('hidden');
+        setStatus($('join-status'), 'Offline link open, saying hello', 'busy');
+        sendHello(link, null);
+      }
+    });
+    conn.on('iceStateChanged', function (st) { if (st === 'failed' && !conn.open) directStatus('The devices could not reach each other. Are they on the same Wi-Fi? Guest networks often block device-to-device traffic.', 'warn'); });
+  }
+  function directTakeCode(text) {
+    text = (text || '').trim();
+    if (!BeamDirect.isCode(text)) return false;
+    if (directRole === 'host') {
+      if (!directConn) return false;
+      directStatus('Connecting', 'busy');
+      BeamDirect.finish(directConn, text).catch(function (e) { directStatus('That reply did not work: ' + e.message, 'warn'); });
+    } else {
+      directStatus('Building the reply', 'busy');
+      BeamDirect.acceptOffer(text, B.parseIce(settings.ice).filter(function (e) { return /stun/.test(JSON.stringify(e.urls)); })).then(function (r) {
+        if (directRole !== 'guest') { r.conn.close(); return; }
+        directConn = r.conn;
+        wireDirect(r.conn);
+        showDirectQr(r.code);
+        $('direct-read').classList.add('hidden'); $('direct-show').classList.remove('hidden');
+        directStatus('Now let the host scan this reply. Connecting as soon as it does.', 'busy');
+      }, function (e) { directStatus('That code did not work: ' + e.message, 'warn'); });
+    }
+    return true;
+  }
+  $('direct-host-btn').addEventListener('click', function () { openDirect('host'); });
+  $('direct-guest-btn').addEventListener('click', function () { openDirect('guest'); });
+  $('direct-back').addEventListener('click', function () { if (directRole === 'host') createRoom(); else showJoinForm(); });
+  $('direct-copy').addEventListener('click', function () { copyText($('direct-code-out').value, 'Code copied'); });
+  $('direct-paste-btn').addEventListener('click', function () { if (!directTakeCode($('direct-code-in').value)) toast('That is not an offline pairing code'); });
+  $('direct-scan').addEventListener('click', function () {
+    startScan({ slot: $('direct-scan-slot'), hint: directRole === 'host' ? 'Point at the reply code' : 'Point at the host code', handle: function (text) {
+      if (!BeamDirect.isCode(text)) return false;
+      scanLocked('Got it', function () { directTakeCode(text); });
+      return true;
+    } });
+  });
+  $('direct-qr').addEventListener('click', function () {
+    var code = $('direct-code-out').value; if (!code || !window.QRCode) return;
+    $('qr-big').innerHTML = '';
+    var size = Math.min(420, window.innerWidth - 90);
+    new QRCode($('qr-big'), { text: code, width: size, height: size, colorDark: '#17232e', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.L });
+    $('qr-big-code').textContent = 'Offline pairing code';
+    $('qr-modal').classList.remove('hidden'); $('qr-modal-close').focus();
+  });
+
   // QR scanning with the camera. Uses the native BarcodeDetector when present, otherwise jsQR.
   var scanStream = null, scanTimer = null, scanFacing = 'environment', scanTrack = null, scanCanvas = null;
-  function startScan() {
+  var scanHandler = null, scanHint = 'Point at the Beam code';
+  // opts: { slot: element to show the scanner in, hint: text, handle: function(text) -> true when accepted }
+  function startScan(opts) {
+    opts = opts || {};
     if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) { toast('Camera access needs HTTPS and a browser with camera support'); return; }
     var video = $('scan-video');
     var vf = $('viewfinder');
     stopScan(true);
+    var slot = opts.slot || $('scan-slot-join');
+    if ($('scanner').parentNode !== slot) slot.appendChild($('scanner'));
+    scanHandler = opts.handle || function (text) { var code = parseCode(text); if (!code) return false; onScanned(code); return true; };
+    scanHint = opts.hint || 'Point at the Beam code';
     $('scanner').classList.remove('hidden');
     vf.classList.add('starting'); vf.classList.remove('found');
     $('scan-btn').classList.add('hidden');
-    $('scan-hint').textContent = 'Point at the Beam code';
+    $('scan-hint').textContent = scanHint;
     var detector = null;
     if ('BarcodeDetector' in window) { try { detector = new BarcodeDetector({ formats: ['qr_code'] }); } catch (e) { detector = null; } }
     if (!detector && !window.jsQR) { $('scan-hint').textContent = 'Scanner library did not load'; }
@@ -1237,9 +1402,7 @@
         var done = function (text) {
           busy = false;
           if (!text) return;
-          var code = parseCode(text);
-          if (!code) { $('scan-hint').textContent = 'That QR is not a Beam code'; return; }
-          onScanned(code);
+          if (!scanHandler(text)) $('scan-hint').textContent = 'That QR is not the code we need here';
         };
         if (detector) {
           detector.detect(video).then(function (codes) { done(codes.length ? codes[0].rawValue : null); }, function () { busy = false; });
@@ -1262,15 +1425,16 @@
       toast(err && err.name === 'NotAllowedError' ? 'Camera access was refused' : 'Could not start the camera' + (err && err.message ? ': ' + err.message : ''));
     });
   }
-  function onScanned(code) {
+  // Lock-on animation, then run cb after the flash.
+  function scanLocked(label, cb) {
     clearInterval(scanTimer); scanTimer = null;
-    var vf = $('viewfinder');
-    vf.classList.add('found');
-    $('scan-hint').textContent = 'Found ' + groupCode(code);
+    $('viewfinder').classList.add('found');
+    $('scan-hint').textContent = label;
     chime();
     if (navigator.vibrate) { try { navigator.vibrate(40); } catch (e) { /* ignore */ } }
-    setTimeout(function () { stopScan(); joinRoom(code); }, 550);
+    setTimeout(function () { stopScan(); cb(); }, 550);
   }
+  function onScanned(code) { scanLocked('Found ' + groupCode(code), function () { joinRoom(code); }); }
   function stopScan(keepUi) {
     clearInterval(scanTimer); scanTimer = null;
     if (scanStream) { scanStream.getTracks().forEach(function (t) { t.stop(); }); scanStream = null; scanTrack = null; }
@@ -1282,7 +1446,7 @@
     }
   }
   $('stop-scan').addEventListener('click', function () { stopScan(); });
-  $('flip-cam').addEventListener('click', function () { scanFacing = scanFacing === 'environment' ? 'user' : 'environment'; startScan(); });
+  $('flip-cam').addEventListener('click', function () { scanFacing = scanFacing === 'environment' ? 'user' : 'environment'; startScan({ slot: $('scanner').parentNode, hint: scanHint, handle: scanHandler }); });
   $('torch-btn').addEventListener('click', function () {
     if (!scanTrack || !scanTrack.applyConstraints) return;
     var on = $('torch-btn').getAttribute('data-on') === '1';
@@ -1387,6 +1551,24 @@
     copyText(text, 'Link copied');
   });
   $('room-code').addEventListener('click', function () { if (roomId) copyText(groupCode(roomId), 'Code copied'); });
+  $('save-qr').addEventListener('click', function () {
+    var img = $('qr').querySelector('img') || $('qr').querySelector('canvas');
+    if (!img || !roomId) { toast('No code yet'); return; }
+    var pad = 40, size = 440, c = document.createElement('canvas');
+    c.width = size + pad * 2; c.height = size + pad * 2 + 90;
+    var g = c.getContext('2d');
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, c.width, c.height);
+    g.drawImage(img, pad, pad, size, size);
+    g.fillStyle = '#17232e'; g.textAlign = 'center';
+    g.font = '600 34px ui-monospace, Menlo, Consolas, monospace';
+    g.fillText(groupCode(roomId) + (roomPin ? '   PIN ' + roomPin : ''), c.width / 2, size + pad + 48);
+    g.font = '16px system-ui, sans-serif'; g.fillStyle = '#66737e';
+    g.fillText($('room-link').textContent, c.width / 2, size + pad + 76);
+    c.toBlob(function (b) {
+      var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'beam-' + roomId + '.png';
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 10000);
+    }, 'image/png');
+  });
   $('share-link').addEventListener('click', function () {
     var text = $('room-link').textContent; if (!text || !navigator.share) return;
     navigator.share({ title: 'Join my Beam room', text: 'Open this link to send files to my device', url: text }).catch(function () {});
@@ -1416,7 +1598,7 @@
     joinRoom(code);
   });
   $('join-code').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('join-btn').click(); });
-  $('scan-btn').addEventListener('click', function () { startScan(); });
+  $('scan-btn').addEventListener('click', function () { startScan({ slot: $('scan-slot-join') }); });
   $('pin-btn').addEventListener('click', function () {
     if (!guestLink) return;
     var pin = $('pin-input').value.trim();
@@ -1475,6 +1657,49 @@
     var code = parseCode(location.hash);
     if (code && code !== roomId) joinRoom(code);
   });
+
+  // Files shared into the installed app (Android share sheet) are parked in a cache by the service worker.
+  if (/[?&]share=1/.test(location.search) && window.caches) {
+    caches.open('beam-share').then(function (c) {
+      return c.keys().then(function (keys) {
+        return Promise.all(keys.map(function (req) {
+          return c.match(req).then(function (res) {
+            var name = decodeURIComponent(req.url.split('/').pop() || 'shared');
+            return res.blob().then(function (b) { c.delete(req); return { file: new File([b], name, { type: b.type }), path: '' }; });
+          });
+        }));
+      });
+    }).then(function (files) {
+      files = files.filter(Boolean);
+      if (files.length) { addFiles(files); toast(files.length + ' shared file' + (files.length === 1 ? '' : 's') + ' ready to send'); }
+      return caches.open('beam-share').then(function (c) {
+        return c.match('./share-text').then(function (res) { if (!res) return; return res.text().then(function (t) { c.delete('./share-text'); if (t.trim()) { $('text-input').value = t; toast('Shared text is in the text box'); } }); });
+      });
+    }).then(function () { try { history.replaceState(null, '', location.pathname); } catch (e) { /* ignore */ } }).catch(function () {});
+  }
+
+  // Easter egg: the Konami code, or seven taps on the logo, opens the summit.
+  var konami = [38, 38, 40, 40, 37, 39, 37, 39, 66, 65], kpos = 0, taps = 0, tapTimer = null;
+  document.addEventListener('keydown', function (e) {
+    if (/^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+    kpos = e.keyCode === konami[kpos] ? kpos + 1 : (e.keyCode === konami[0] ? 1 : 0);
+    if (kpos === konami.length) { kpos = 0; summit(); }
+  });
+  document.querySelector('.brand').addEventListener('click', function (e) {
+    e.preventDefault();
+    taps++; clearTimeout(tapTimer); tapTimer = setTimeout(function () { taps = 0; }, 1500);
+    if (taps >= 7) { taps = 0; summit(); }
+  });
+  function summit() {
+    if (!window.BeamTopo) return;
+    var on = BeamTopo.toggleSummit();
+    document.body.classList.toggle('summit', on);
+    if (on) {
+      toast('Summit reached. Elevation: 1 hidden mode. Made by Londo!');
+      B.chime();
+      if (navigator.vibrate) { try { navigator.vibrate([30, 60, 30]); } catch (e) { /* ignore */ } }
+    } else toast('Back to base camp');
+  }
 
   // Start
   if (!window.Peer) {
