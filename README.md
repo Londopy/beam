@@ -10,9 +10,10 @@ browsers; a tiny signaling server is only used to introduce them.
 
 ## Try it
 
-Live demo: `https://londopy.github.io/beam/`
+Live: https://londopy.github.io/beam/
 
-(Replace with your own Pages URL after deploying, see below.)
+Open it on two devices, or install it from the browser menu ("Add to Home
+Screen" / "Install app") to get an icon and full-screen window.
 
 ## Features
 
@@ -176,6 +177,10 @@ Then open `http://localhost:8000/`. To test between two devices on your LAN
 you need HTTPS for the camera and clipboard APIs; the easiest route is to push
 to GitHub Pages, or use a tool like `mkcert` to serve locally with a trusted
 certificate.
+
+## Changes
+
+See `CHANGELOG.md`.
 
 ## License
 
