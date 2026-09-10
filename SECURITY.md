@@ -11,10 +11,12 @@ Things to know:
   devices connect if that matters to you.
 - Your IP address is visible to the other peer, as with any WebRTC
   connection.
-- When a direct connection is not possible, traffic goes through a TURN
-  relay (the free Open Relay server by default). The relay forwards encrypted
-  packets and cannot read them, but it does see both devices' addresses. Run
-  your own TURN server (Settings > Connection) if that matters to you.
+- When a direct connection is not possible and a TURN relay is configured,
+  traffic goes through that relay. It forwards encrypted packets and cannot
+  read them, but it does see both devices' addresses. A TURN credentials URL
+  containing an API key is visible to anyone who reads the page's settings in
+  their own browser only; it is never sent to other peers. Restrict the key
+  to your domain at the provider anyway.
 - The connection check contacts `cloudflare.com/cdn-cgi/trace` once to learn
   your public web address. Nothing else leaves the browser during the check.
 - Libraries are loaded from cdnjs (PeerJS, qrcode.js, JSZip) and jsDelivr

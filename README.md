@@ -110,10 +110,9 @@ Settings; see "Self-hosting the signaling server" below.
 
 ## Limitations and caveats
 
-* Cross-network connections use STUN first and fall back to the free public
-Open Relay TURN server (openrelay.metered.ca). That relay is a community
-service with no uptime promise; for anything important, add your own TURN
-server under Settings > Connection.
+* Devices on different networks need a TURN relay unless both routers allow
+direct hole punching (many home routers, and most phone carriers, do not).
+Beam ships with STUN only, so set one up once: see "Getting a relay" below.
 * Except on Chromium desktop with a save folder set, received files are held
 in memory until you tap Save. Very large files on a phone can crash the
 tab. Stream-to-disk is the fix where available.
@@ -124,6 +123,27 @@ PIN. Anyone with the link can connect while the room is open and unlocked.
 * iOS needs a manual tap on Save; there is no automatic download.
 * The public PeerJS server is a free community service with no uptime
 promise. For anything important, self-host.
+
+## Getting a relay (TURN)
+
+STUN only tells each device its public address. When a router is a symmetric
+NAT, that is not enough and the two devices never find each other; a TURN
+relay forwards the (still end-to-end encrypted) traffic instead. Run the
+connection check under Settings > Check to see whether you need one; the
+"NAT type" line says so.
+
+The easy way: create a free app at https://www.metered.ca/stun-turn, copy the
+credentials URL it shows (it ends in `?apiKey=...`), restrict the key to your
+Beam domain in their dashboard, and paste the URL into Settings > Connection >
+TURN credentials URL. Beam fetches short-lived credentials from it each time a
+room is created or joined. Any provider whose endpoint returns a JSON array of
+ICE servers works the same way (Twilio, Xirsys, Cloudflare Realtime with a
+tiny worker in front).
+
+The self-hosted way: run `coturn` on a machine with a public address and put
+its `turn:` and `turns:` URLs with a fixed username and password into the
+ICE servers JSON. Port 443 with `turns:` is the one that gets through hotel
+and corporate networks.
 
 ## Self-hosting the signaling server
 
@@ -137,14 +157,6 @@ To run your own:
 Put it behind HTTPS (Caddy, nginx, or a reverse proxy) and enter the host,
 port, path, and key in Beam's Settings. A Docker image is also published as
 `peerjs/peerjs-server`.
-
-If you also need TURN, `coturn` is the usual choice. Add it to the ICE
-servers JSON in Settings, for example:
-
-&#x20;   \[
-      { "urls": \["stun:stun.l.google.com:19302"] },
-      { "urls": "turn:turn.example.com:3478", "username": "u", "credential": "p" }
-    ]
 
 
 ## Repository layout

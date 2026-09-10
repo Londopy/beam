@@ -2,6 +2,21 @@
 
 All notable changes to Beam. Dates are when the change landed on `main`.
 
+## 1.2.1 - 2026-09-10
+
+Added
+- TURN credentials URL setting: Beam fetches short-lived relay credentials
+  from a provider endpoint (Metered, Twilio, Xirsys, or your own) each time a
+  room is created or joined, and the connection check verifies it.
+
+Changed
+- Removed the Open Relay server from the default ICE list; it no longer
+  allocates. Saved settings that still contain it are cleaned up.
+- NAT type test now compares mappings from one socket, so cone NATs are not
+  misreported as symmetric.
+- Public address lookup falls back to a second service when the first is
+  blocked by an ad blocker.
+
 ## 1.2.0 - 2026-09-10
 
 Added

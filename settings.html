@@ -118,9 +118,13 @@
         <option value="no">Plain ws / http</option>
       </select>
     </label>
+    <label class="field"><span>TURN credentials URL (recommended)</span>
+      <input type="url" id="set-iceurl" placeholder="https://your-app.metered.live/api/v1/turn/credentials?apiKey=..." autocomplete="off" spellcheck="false">
+      <small>A relay (TURN) server is what makes Beam work when the two devices are on different networks. Free tiers exist: at <a href="https://www.metered.ca/stun-turn" target="_blank" rel="noopener">metered.ca</a> create an app, copy the "credentials URL" with your API key, and paste it here (restrict the key to your Beam domain in their dashboard). Beam fetches fresh short-lived credentials from it each time a room is created or joined and adds them to the servers below.</small>
+    </label>
     <label class="field"><span>ICE servers (JSON array)</span>
       <textarea id="set-ice" class="mono" rows="6" spellcheck="false"></textarea>
-      <small>Add a TURN server if devices on different networks cannot connect. Example: <code>{ "urls": "turn:turn.example.com:3478", "username": "u", "credential": "p" }</code></small>
+      <small>STUN servers plus any TURN server with fixed credentials, for example your own coturn: <code>{ "urls": "turn:turn.example.com:3478", "username": "u", "credential": "p" }</code></small>
       <div class="field-error hidden" id="ice-error"></div>
     </label>
     <div class="row">
@@ -182,6 +186,7 @@
     $('set-path').value = settings.path; $('set-key').value = settings.key;
     $('set-secure').value = settings.secure;
     $('set-ice').value = settings.ice;
+    $('set-iceurl').value = settings.iceUrl || '';
     validateIce();
     B.applyTheme(settings.theme);
   }
@@ -217,6 +222,7 @@
     settings.path = $('set-path').value.trim();
     settings.key = $('set-key').value.trim();
     settings.secure = $('set-secure').value;
+    settings.iceUrl = $('set-iceurl').value.trim();
     if (validateIce()) settings.ice = $('set-ice').value;
   }
 
@@ -239,7 +245,7 @@
   for (var i = 0; i < inputs.length; i++) {
     if (inputs[i].id === 'import-file') continue;
     inputs[i].addEventListener('change', persist);
-    if (inputs[i].type === 'text' || inputs[i].type === 'number' || inputs[i].tagName === 'TEXTAREA') {
+    if (inputs[i].type === 'text' || inputs[i].type === 'url' || inputs[i].type === 'number' || inputs[i].tagName === 'TEXTAREA') {
       inputs[i].addEventListener('input', function () { clearTimeout(debounce); debounce = setTimeout(persist, 500); });
     }
   }

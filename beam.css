@@ -170,7 +170,7 @@ button:focus-visible, .btn:focus-visible, .drop:focus-visible, input:focus-visib
 .icon-btn svg { width: 18px; height: 18px; }
 button svg, .btn svg { width: 16px; height: 16px; flex-shrink: 0; }
 
-input[type="text"], input[type="number"], input[type="password"], input[type="search"], textarea, select {
+input[type="text"], input[type="url"], input[type="number"], input[type="password"], input[type="search"], textarea, select {
   font: inherit; font-size: 15px; padding: 9px 12px; border-radius: var(--radius-s);
   border: 1px solid var(--line); background: var(--bg); color: var(--ink); width: 100%;
 }

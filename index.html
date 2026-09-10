@@ -333,6 +333,7 @@
   var stats = { sent: 0, recv: 0, filesSent: 0, filesRecv: 0 };
   var idCounter = 0;
   var wakeLock = null;
+  var hostUsingStored = false;
 
   function nextId() { return 't' + (++idCounter) + randomId(4); }
   function linkCount() { return Object.keys(links).length; }
@@ -1032,6 +1033,7 @@
   // Host
   // -------------------------------------------------------------------
   function teardown() {
+    peerGen++;
     for (var k in links) { try { links[k].conn.close(); } catch (e) { /* ignore */ } }
     links = {}; guestLink = null;
     if (peer) { try { peer.destroy(); } catch (e) { /* ignore */ } }
@@ -1051,7 +1053,7 @@
     teardown();
     setMode('host');
     var stored = settings.stableCode ? loadRoom() : {};
-    var usingStored = !rotate && /^[a-z0-9]{10}$/.test(stored.id || '');
+    var usingStored = hostUsingStored = !rotate && /^[a-z0-9]{10}$/.test(stored.id || '');
     roomId = usingStored ? stored.id : randomId(10);
     roomPin = settings.pin ? (usingStored && stored.pin ? String(stored.pin) : randomPin()) : null;
     if (settings.stableCode) saveRoom();
@@ -1066,8 +1068,14 @@
     setStatus($('room-status'), 'Connecting to signaling server', 'busy');
     try { history.replaceState(null, '', location.pathname); } catch (e) { /* ignore */ }
 
+    var gen = ++peerGen;
+    B.resolveIce(settings).then(function (ice) { if (gen === peerGen) startHost(ice); });
+  }
+  var peerGen = 0;
+  function startHost(ice) {
+    var usingStored = hostUsingStored;
     var thisPeer;
-    try { thisPeer = peer = new Peer(roomId, B.peerOptions(settings)); }
+    try { thisPeer = peer = new Peer(roomId, B.peerOptions(settings, ice)); }
     catch (e) { setStatus($('room-status'), 'Could not start: ' + e.message, 'warn'); return; }
     var hostOpened = false;
     setTimeout(function () {
@@ -1158,8 +1166,12 @@
     setStatus($('join-status'), 'Connecting to ' + groupCode(code), 'busy');
     $('lede').textContent = 'Connecting to the other device.';
 
+    var gen = ++peerGen;
+    B.resolveIce(settings).then(function (ice) { if (gen === peerGen && mode === 'guest' && roomId === code) startGuest(code, ice); });
+  }
+  function startGuest(code, ice) {
     var thisPeer;
-    try { thisPeer = peer = new Peer(undefined, B.peerOptions(settings)); }
+    try { thisPeer = peer = new Peer(undefined, B.peerOptions(settings, ice)); }
     catch (e) { setStatus($('join-status'), 'Could not start: ' + e.message, 'warn'); return; }
     var opened = false;
     var signalTimer = setTimeout(function () {

@@ -89,14 +89,21 @@
       var r = { id: id, level: level, title: title, detail: detail || '', advice: advice || '' };
       results.push(r); if (report) report(r, results); return r;
     };
-    var ice = [];
-    try { ice = JSON.parse(settings.ice); if (!Array.isArray(ice)) ice = []; } catch (e) { ice = []; }
-    var stunOnly = ice.filter(function (s) { var u = [].concat(s.urls || []); return u.some(function (x) { return /^stuns?:/.test(x); }); })
-      .map(function (s) { return { urls: [].concat(s.urls).filter(function (x) { return /^stuns?:/.test(x); }) }; });
-    var turnOnly = ice.filter(function (s) { var u = [].concat(s.urls || []); return u.some(function (x) { return /^turns?:/.test(x); }); });
+    var ice = [], iceFromUrl = null;
+    var stunOnly, turnOnly;
     var facts = {};
 
-    return Promise.resolve().then(function () {
+    return window.Beam.resolveIce(settings).then(function (list) {
+      ice = list;
+      if ((settings.iceUrl || '').trim()) {
+        iceFromUrl = list.length > window.Beam.parseIce(settings.ice).length;
+        add('iceurl', iceFromUrl ? 'ok' : 'fail', 'TURN credentials URL', iceFromUrl ? 'returned ' + (list.length - window.Beam.parseIce(settings.ice).length) + ' server entr' + (list.length - window.Beam.parseIce(settings.ice).length === 1 ? 'y' : 'ies') : 'no usable servers came back',
+          iceFromUrl ? '' : 'The URL did not return an ICE server list. Check the API key, the app domain restriction, and that the response is JSON (open the URL in a new tab to see it).');
+      }
+      stunOnly = ice.filter(function (s) { var u = [].concat(s.urls || []); return u.some(function (x) { return /^stuns?:/.test(x); }); })
+      .map(function (s) { return { urls: [].concat(s.urls).filter(function (x) { return /^stuns?:/.test(x); }) }; });
+      turnOnly = ice.filter(function (s) { var u = [].concat(s.urls || []); return u.some(function (x) { return /^turns?:/.test(x); }); });
+    }).then(function () {
       // 1. Basics
       var secure = window.isSecureContext;
       add('secure', secure ? 'ok' : 'fail', 'Secure page (HTTPS)', secure ? location.origin : 'Not a secure context', secure ? '' : 'Camera, clipboard, and WebRTC need HTTPS. Use the GitHub Pages address.');
@@ -158,7 +165,7 @@
         facts.relayProtos = uniq(relay.map(function (c) { return c.protocol + (c.raddr ? '' : ''); }));
         add('turn', relay.length ? 'ok' : (turnOnly.length ? 'fail' : 'warn'), 'TURN relay (fallback path)',
           relay.length ? relay.length + ' relay candidate' + (relay.length === 1 ? '' : 's') + ' (' + facts.relayProtos.join(', ') + ')' : (turnOnly.length ? 'relay server did not allocate' : 'no TURN server configured'),
-          relay.length ? '' : (turnOnly.length ? 'The TURN server is unreachable or the credentials are wrong. If UDP is blocked, make sure the list includes a turns: entry on port 443.' : 'Add a TURN server in Connection settings so devices on different networks can still connect.'));
+          relay.length ? '' : (turnOnly.length ? 'The TURN server is unreachable or the credentials are wrong or expired. If UDP is blocked, make sure the list includes a turns: entry on port 443.' : 'Without a relay, devices on different networks can only connect if both routers allow direct hole punching. Paste a TURN credentials URL in Connection settings (free tier at metered.ca) or add your own TURN server.'));
         if (ifaces > 1) add('ifaces', 'warn', 'Multiple network interfaces', ifaces + ' active interfaces seen',
           'More than one interface usually means a VPN, virtual machine, or Hyper-V/WSL adapter is active. A VPN can route WebRTC through its tunnel or block it entirely; try with the VPN off.');
       });
@@ -184,7 +191,11 @@
       // 6. HTTP egress address vs STUN address: VPN / proxy / split tunnel detection, plus Cloudflare WARP flag
       return withTimeout(fetch('https://www.cloudflare.com/cdn-cgi/trace', { cache: 'no-store' }).then(function (r) { return r.text(); }), 6000, '')
         .then(function (txt) {
-          if (!txt) { add('egress', 'info', 'Public address check', 'could not reach the lookup service'); return; }
+          if (txt) return txt;
+          return withTimeout(fetch('https://api.ipify.org?format=json', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) { return j && j.ip ? 'ip=' + j.ip : ''; }), 6000, '');
+        })
+        .then(function (txt) {
+          if (!txt) { add('egress', 'info', 'Public address check', 'lookup services blocked (an ad blocker, probably); skipped', 'Not a problem for Beam itself.'); return; }
           var kv = {}; txt.split('\n').forEach(function (l) { var i = l.indexOf('='); if (i > 0) kv[l.slice(0, i)] = l.slice(i + 1); });
           facts.httpIp = kv.ip || ''; facts.warp = kv.warp; facts.loc = kv.loc;
           var d = 'web traffic leaves from ' + (kv.ip || '?') + (kv.loc ? ' (' + kv.loc + ')' : '');
@@ -208,12 +219,18 @@
       var urls = []; stunOnly.forEach(function (s) { urls = urls.concat(s.urls); });
       urls = uniq(urls);
       if (urls.length < 2) return;
-      return Promise.all([gather([{ urls: urls[0] }], 'all', 5000), gather([{ urls: urls[1] }], 'all', 5000)]).then(function (r) {
-        var a = r[0].filter(function (c) { return c.type === 'srflx'; })[0], b = r[1].filter(function (c) { return c.type === 'srflx'; })[0];
-        if (!a || !b) return;
-        if (a.address === b.address && a.port === b.port) add('nat', 'ok', 'NAT type', 'consistent mapping (' + a.address + ':' + a.port + '), direct connections should work');
-        else add('nat', 'warn', 'NAT type', 'symmetric: ' + a.address + ':' + a.port + ' vs ' + b.address + ':' + b.port,
-          'Your router gives every destination a different port, so hole punching fails. Connections will need the relay. Enabling UPnP or "full cone" NAT on the router helps, as does turning off a VPN.');
+      // One connection, several STUN servers: the same local socket asks each server what it looks like from
+      // outside. A cone NAT answers with one mapping (ICE dedupes it); a symmetric NAT gives each server a different port.
+      return gather(urls.slice(0, 2).map(function (u) { return { urls: u }; }), 'all', 6000).then(function (cands) {
+        var srflx = cands.filter(function (c) { return c.type === 'srflx' && c.protocol === 'udp'; });
+        if (!srflx.length) return;
+        var byBase = {};
+        srflx.forEach(function (c) { var k = c.raddr + ':' + c.rport; (byBase[k] = byBase[k] || []).push(c.address + ':' + c.port); });
+        var symmetric = false, sample = '';
+        for (var k in byBase) { var m = uniq(byBase[k]); if (m.length > 1) { symmetric = true; sample = m.join(' vs '); break; } sample = m[0]; }
+        if (!symmetric) add('nat', 'ok', 'NAT type', 'consistent mapping (' + sample + '), direct connections should work');
+        else add('nat', 'warn', 'NAT type', 'symmetric: ' + sample,
+          'Your router gives every destination a different port, so hole punching fails and connections need the relay. Some routers have a "full cone" or "NAT type open" setting, and turning off a VPN helps.');
       });
     }).then(function () {
       if (!facts.rtc) return;
@@ -245,7 +262,7 @@
       var verdict;
       if (fails.some(function (r) { return /^signal/.test(r.id) || r.id === 'webrtc' || r.id === 'secure'; })) verdict = { level: 'fail', text: 'Beam cannot connect from this browser right now. Fix the red items first.' };
       else if (facts.relayOk && (facts.stunIp || facts.udp === false)) verdict = { level: warns.length ? 'warn' : 'ok', text: warns.length ? 'Connections should work, possibly through the relay. The yellow items explain why direct links may fail.' : 'Everything looks good. Direct connections should work.' };
-      else if (facts.stunIp) verdict = { level: 'warn', text: 'Direct connections should work on friendly networks, but there is no working relay to fall back on.' };
+      else if (facts.stunIp) verdict = { level: 'warn', text: 'Direct connections work only when both routers cooperate; there is no working relay to fall back on. Add a TURN credentials URL in Connection settings.' };
       else verdict = { level: 'fail', text: 'Neither STUN nor a relay is reachable, so only same-network connections can work.' };
       return { results: results, verdict: verdict, facts: facts };
     });

@@ -34,10 +34,8 @@
     chunk: 32768,
     host: '', port: '', path: '', key: '',
     secure: 'auto',           // auto | yes | no
-    ice: JSON.stringify([
-      { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
-      { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turns:openrelay.metered.ca:443'], username: 'openrelayproject', credential: 'openrelayproject' }
-    ], null, 2)
+    iceUrl: '',               // optional: URL that returns a JSON array of ICE servers (short-lived TURN credentials)
+    ice: JSON.stringify([{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }], null, 2)
   };
 
   function load() {
@@ -48,7 +46,13 @@
     // Older versions stored the guessed name; treat it as the default so a new device keeps auto-naming.
     if (typeof s.name !== 'string') s.name = '';
     s.chunk = parseInt(s.chunk, 10) || DEFAULTS.chunk;
-    if (typeof s.ice === 'string' && /^\s*\[\s*\{\s*"urls"\s*:\s*\[\s*"stun:stun\.l\.google\.com:19302"\s*,\s*"stun:stun1\.l\.google\.com:19302"\s*\]\s*\}\s*\]\s*$/.test(s.ice)) s.ice = DEFAULTS.ice;
+    // The Open Relay server that an earlier version put in the defaults no longer allocates; drop it.
+    if (typeof s.ice === 'string' && s.ice.indexOf('openrelay.metered.ca') >= 0) {
+      try {
+        var arr = JSON.parse(s.ice).filter(function (e) { return JSON.stringify(e.urls || '').indexOf('openrelay.metered.ca') < 0; });
+        s.ice = arr.length ? JSON.stringify(arr, null, 2) : DEFAULTS.ice;
+      } catch (e) { s.ice = DEFAULTS.ice; }
+    }
     return s;
   }
 
@@ -69,7 +73,37 @@
     }
   }
 
-  function peerOptions(s) {
+  function parseIce(text) {
+    try { var v = JSON.parse(text); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+  }
+
+  // Resolves the ICE server list: the static JSON plus, when set, servers fetched from the credentials URL.
+  // The URL is expected to return a JSON array of RTCIceServer objects, or an object with an iceServers array
+  // (the format Metered, Twilio, Xirsys, and Cloudflare style endpoints use). Fetched servers are cached for 5 minutes.
+  var iceCache = { url: '', at: 0, servers: null };
+  function resolveIce(s) {
+    var base = parseIce(s.ice);
+    var url = (s.iceUrl || '').trim();
+    if (!url) return Promise.resolve(base);
+    if (iceCache.url === url && iceCache.servers && Date.now() - iceCache.at < 5 * 60 * 1000) return Promise.resolve(iceCache.servers.concat(base));
+    var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, 6000) : null;
+    return fetch(url, { cache: 'no-store', signal: ctrl ? ctrl.signal : undefined }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function (j) {
+      var list = Array.isArray(j) ? j : (j && Array.isArray(j.iceServers) ? j.iceServers : (j && j.v && Array.isArray(j.v.iceServers) ? j.v.iceServers : []));
+      list = list.filter(function (e) { return e && e.urls; });
+      if (!list.length) throw new Error('no servers in response');
+      iceCache = { url: url, at: Date.now(), servers: list };
+      return list.concat(base);
+    }).catch(function (e) {
+      console.warn('ICE credentials URL failed', e);
+      return base;
+    }).then(function (v) { if (timer) clearTimeout(timer); return v; });
+  }
+
+  function peerOptions(s, iceServers) {
     var o = { debug: 1 };
     if (s.host) {
       o.host = s.host;
@@ -80,10 +114,8 @@
       // 'auto' leaves it to PeerJS, which follows the page protocol.
       if (s.key) o.key = s.key;
     }
-    try {
-      var ice = JSON.parse(s.ice);
-      if (Array.isArray(ice) && ice.length) o.config = { iceServers: ice };
-    } catch (e) { /* keep library default */ }
+    var ice = iceServers || parseIce(s.ice);
+    if (ice.length) o.config = { iceServers: ice };
     return o;
   }
 
@@ -131,6 +163,8 @@
     guessDevice: guessDevice,
     applyTheme: applyTheme,
     peerOptions: peerOptions,
+    parseIce: parseIce,
+    resolveIce: resolveIce,
     fmtBytes: fmtBytes,
     toast: toast
   };
