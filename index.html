@@ -7,15 +7,17 @@
 <meta name="description" content="Send files and text between your devices, browser to browser, by scanning a QR code.">
 <title>Beam - share files between devices</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <link rel="stylesheet" href="beam.css">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231f7a55'/%3E%3Cpath d='M9 16h14M17 10l6 6-6 6' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
 <script src="common.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" defer></script>
 </head>
 <body>
+<canvas id="topo" aria-hidden="true"></canvas>
 <main>
   <header class="top">
     <a class="brand" href="./" aria-label="Beam">
@@ -68,7 +70,21 @@
         <button type="button" class="primary" id="join-btn">Connect</button>
         <button type="button" id="scan-btn" class="hidden">Scan a QR code</button>
       </div>
-      <video id="scan-video" class="hidden" playsinline muted></video>
+      <div class="scanner hidden" id="scanner">
+        <div class="viewfinder starting" id="viewfinder">
+          <video id="scan-video" playsinline muted autoplay></video>
+          <div class="mask"></div>
+          <div class="grid"></div>
+          <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+          <div class="laser"></div>
+          <div class="hint" id="scan-hint">Point at the Beam code</div>
+        </div>
+        <div class="row">
+          <button type="button" id="flip-cam" class="small hidden">Switch camera</button>
+          <button type="button" id="torch-btn" class="small hidden">Light</button>
+          <button type="button" id="stop-scan" class="small">Stop</button>
+        </div>
+      </div>
     </div>
     <div id="pin-form" class="hidden">
       <label class="field"><span>This room needs a PIN. Ask the host for it.</span>
@@ -1115,7 +1131,8 @@
     $('join-form').classList.remove('hidden'); $('pin-form').classList.add('hidden'); $('leave-btn').classList.add('hidden');
     $('lede').textContent = 'Enter the code shown on the other device.';
     setStatus($('join-status'), '');
-    $('scan-btn').classList.toggle('hidden', !('BarcodeDetector' in window && navigator.mediaDevices));
+    $('scan-btn').classList.toggle('hidden', !(navigator.mediaDevices && navigator.mediaDevices.getUserMedia));
+    $('scanner').classList.add('hidden');
   }
 
   function joinRoom(code) {
@@ -1159,32 +1176,90 @@
     });
   }
 
-  // QR scanning with the camera (Chromium on Android/desktop)
-  var scanStream = null, scanTimer = null;
+  // QR scanning with the camera. Uses the native BarcodeDetector when present, otherwise jsQR.
+  var scanStream = null, scanTimer = null, scanFacing = 'environment', scanTrack = null, scanCanvas = null;
   function startScan() {
+    if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) { toast('Camera access needs HTTPS and a browser with camera support'); return; }
     var video = $('scan-video');
-    var detector;
-    try { detector = new BarcodeDetector({ formats: ['qr_code'] }); } catch (e) { toast('QR scanning not supported here'); return; }
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(function (stream) {
-      scanStream = stream; video.srcObject = stream; video.classList.remove('hidden'); video.play();
-      $('scan-btn').textContent = 'Stop scanning';
+    var vf = $('viewfinder');
+    stopScan(true);
+    $('scanner').classList.remove('hidden');
+    vf.classList.add('starting'); vf.classList.remove('found');
+    $('scan-btn').classList.add('hidden');
+    $('scan-hint').textContent = 'Point at the Beam code';
+    var detector = null;
+    if ('BarcodeDetector' in window) { try { detector = new BarcodeDetector({ formats: ['qr_code'] }); } catch (e) { detector = null; } }
+    if (!detector && !window.jsQR) { $('scan-hint').textContent = 'Scanner library did not load'; }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: scanFacing }, width: { ideal: 1280 }, height: { ideal: 1280 } }, audio: false }).then(function (stream) {
+      scanStream = stream; video.srcObject = stream;
+      scanTrack = stream.getVideoTracks()[0];
+      var p = video.play(); if (p && p.catch) p.catch(function () {});
+      video.addEventListener('loadedmetadata', function () { vf.classList.remove('starting'); }, { once: true });
+      var caps = scanTrack.getCapabilities ? scanTrack.getCapabilities() : {};
+      $('torch-btn').classList.toggle('hidden', !caps.torch);
+      navigator.mediaDevices.enumerateDevices().then(function (devs) {
+        var cams = devs.filter(function (d) { return d.kind === 'videoinput'; });
+        $('flip-cam').classList.toggle('hidden', cams.length < 2);
+      }).catch(function () {});
+      if (!scanCanvas) scanCanvas = document.createElement('canvas');
+      var busy = false;
       scanTimer = setInterval(function () {
-        if (video.readyState < 2) return;
-        detector.detect(video).then(function (codes) {
-          for (var i = 0; i < codes.length; i++) {
-            var code = parseCode(codes[i].rawValue);
-            if (code) { stopScan(); joinRoom(code); return; }
-          }
-        }).catch(function () {});
-      }, 300);
-    }, function () { toast('Camera access was refused'); });
+        if (busy || video.readyState < 2) return;
+        busy = true;
+        var done = function (text) {
+          busy = false;
+          if (!text) return;
+          var code = parseCode(text);
+          if (!code) { $('scan-hint').textContent = 'That QR is not a Beam code'; return; }
+          onScanned(code);
+        };
+        if (detector) {
+          detector.detect(video).then(function (codes) { done(codes.length ? codes[0].rawValue : null); }, function () { busy = false; });
+        } else if (window.jsQR) {
+          var vw = video.videoWidth, vh = video.videoHeight;
+          if (!vw || !vh) { busy = false; return; }
+          // Decode the centre square only: faster and matches the viewfinder window.
+          var side = Math.min(vw, vh), sx = (vw - side) / 2, sy = (vh - side) / 2;
+          var size = Math.min(side, 640);
+          scanCanvas.width = size; scanCanvas.height = size;
+          var c2 = scanCanvas.getContext('2d', { willReadFrequently: true });
+          c2.drawImage(video, sx, sy, side, side, 0, 0, size, size);
+          var img = c2.getImageData(0, 0, size, size);
+          var r = window.jsQR(img.data, size, size, { inversionAttempts: 'attemptBoth' });
+          done(r ? r.data : null);
+        } else busy = false;
+      }, 180);
+    }, function (err) {
+      stopScan();
+      toast(err && err.name === 'NotAllowedError' ? 'Camera access was refused' : 'Could not start the camera' + (err && err.message ? ': ' + err.message : ''));
+    });
   }
-  function stopScan() {
+  function onScanned(code) {
     clearInterval(scanTimer); scanTimer = null;
-    if (scanStream) { scanStream.getTracks().forEach(function (t) { t.stop(); }); scanStream = null; }
-    var video = $('scan-video'); video.srcObject = null; video.classList.add('hidden');
-    $('scan-btn').textContent = 'Scan a QR code';
+    var vf = $('viewfinder');
+    vf.classList.add('found');
+    $('scan-hint').textContent = 'Found ' + groupCode(code);
+    chime();
+    if (navigator.vibrate) { try { navigator.vibrate(40); } catch (e) { /* ignore */ } }
+    setTimeout(function () { stopScan(); joinRoom(code); }, 550);
   }
+  function stopScan(keepUi) {
+    clearInterval(scanTimer); scanTimer = null;
+    if (scanStream) { scanStream.getTracks().forEach(function (t) { t.stop(); }); scanStream = null; scanTrack = null; }
+    var video = $('scan-video'); video.srcObject = null;
+    if (!keepUi) {
+      $('scanner').classList.add('hidden');
+      $('viewfinder').classList.remove('found');
+      $('scan-btn').classList.remove('hidden');
+    }
+  }
+  $('stop-scan').addEventListener('click', function () { stopScan(); });
+  $('flip-cam').addEventListener('click', function () { scanFacing = scanFacing === 'environment' ? 'user' : 'environment'; startScan(); });
+  $('torch-btn').addEventListener('click', function () {
+    if (!scanTrack || !scanTrack.applyConstraints) return;
+    var on = $('torch-btn').getAttribute('data-on') === '1';
+    scanTrack.applyConstraints({ advanced: [{ torch: !on }] }).then(function () { $('torch-btn').setAttribute('data-on', on ? '0' : '1'); $('torch-btn').textContent = on ? 'Light' : 'Light off'; }).catch(function () { toast('Torch not available'); });
+  });
 
   // -------------------------------------------------------------------
   // File collection (drop, folders, paste)
@@ -1313,7 +1388,7 @@
     joinRoom(code);
   });
   $('join-code').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('join-btn').click(); });
-  $('scan-btn').addEventListener('click', function () { if (scanStream) stopScan(); else startScan(); });
+  $('scan-btn').addEventListener('click', function () { startScan(); });
   $('pin-btn').addEventListener('click', function () {
     if (!guestLink) return;
     var pin = $('pin-input').value.trim();
@@ -1384,5 +1459,6 @@
   if (startCode) joinRoom(startCode); else createRoom();
 })();
 </script>
+<script src="topo.js"></script>
 </body>
 </html>

@@ -19,8 +19,9 @@ Live demo: `https://londopy.github.io/beam/`
 Connecting
 
 * Host a room (QR code plus a typed code like `abcde-fghij`) or join one by
-typing the code, pasting the link, or scanning a QR with the camera
-(Chromium on Android and desktop).
+typing the code, pasting the link, or scanning the QR with the camera right
+on the page (any browser with camera access; uses the native detector where
+available and jsQR elsewhere).
 * Several devices can join the same room. The host can send to one device or
 to everyone.
 * Optional PIN to join (shown next to the QR, never included in the link),
@@ -87,8 +88,9 @@ clipboard, and File System Access APIs require a secure context.
 
 ## How it works
 
-* `index.html` loads three libraries from cdnjs: PeerJS (WebRTC wrapper),
-qrcode.js (QR rendering), and JSZip (Save all as zip). `common.js` holds the
+* `index.html` loads PeerJS (WebRTC wrapper), qrcode.js (QR rendering), and
+JSZip (Save all as zip) from cdnjs, and jsQR (QR scanning fallback) from
+jsDelivr. `topo.js` draws the drifting contour-line background on a canvas. `common.js` holds the
 settings storage and theme code shared with `settings.html`; `beam.css` is
 the shared stylesheet.
 * The host creates a PeerJS peer with a random 10-character id and shows a
@@ -115,9 +117,7 @@ tab. Stream-to-disk is the fix where available.
 drops the connection.
 * The room code is the only thing protecting the room unless you enable the
 PIN. Anyone with the link can connect while the room is open and unlocked.
-* Safari on iOS does not support camera QR scanning inside the page; use the
-system camera app, which opens the link directly. iOS also needs a manual
-tap on Save; there is no automatic download.
+* iOS needs a manual tap on Save; there is no automatic download.
 * The public PeerJS server is a free community service with no uptime
 promise. For anything important, self-host.
 
@@ -149,6 +149,7 @@ servers JSON in Settings, for example:
     settings.html                 the settings page
     common.js                     settings storage and theme, shared
     beam.css                      stylesheet, shared
+    topo.js                       contour-line background
     basic/index.html              the original one-way, one-file version
     .github/workflows/pages.yml   GitHub Pages deployment
     .nojekyll                     tells Pages not to run Jekyll
