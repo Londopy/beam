@@ -404,7 +404,15 @@
     };
     conn.on('data', function (d) { onData(link, d); });
     conn.on('close', function () { onLinkClose(link); });
-    conn.on('error', function (e) { console.warn('link error', e); });
+    conn.on('error', function (e) { console.warn('link error', e); if (!link.ready) connectFailed(link, 'Connection error: ' + (e && e.message ? e.message : e)); });
+    conn.on('iceStateChanged', function (state) {
+      if (state === 'failed') {
+        if (!link.ready) connectFailed(link, 'The two devices could not reach each other directly, and the relay did not help either. Try the same Wi-Fi, or add a TURN server under Settings > Connection.');
+        else if (mode === 'guest') setStatus($('join-status'), 'Connection to ' + link.name + ' lost.', 'warn');
+      } else if (state === 'connected' || state === 'completed') {
+        if (link.ready) detectRoute(link);
+      }
+    });
     return link;
   }
 
@@ -499,6 +507,16 @@
         break;
       case 'rename': link.name = String(msg.name || link.name).slice(0, 40); renderDevices(); break;
     }
+  }
+
+  function connectFailed(link, text) {
+    if (mode === 'guest') {
+      setStatus($('join-status'), text, 'warn');
+      $('join-form').classList.remove('hidden'); $('pin-form').classList.add('hidden');
+    } else {
+      setStatus($('room-status'), 'A device tried to join but the connection failed. ' + text, 'warn');
+    }
+    try { link.conn.close(); } catch (e) { /* ignore */ }
   }
 
   // ---- Handshake ----
@@ -1019,8 +1037,13 @@
     var thisPeer;
     try { thisPeer = peer = new Peer(roomId, B.peerOptions(settings)); }
     catch (e) { setStatus($('room-status'), 'Could not start: ' + e.message, 'warn'); return; }
+    var hostOpened = false;
+    setTimeout(function () {
+      if (peer === thisPeer && !hostOpened) setStatus($('room-status'), 'Cannot reach the signaling server (0.peerjs.com). An ad blocker, VPN, or firewall may be blocking it. Check Settings > Connection > Test.', 'warn');
+    }, 10000);
     thisPeer.on('open', function () {
       if (peer !== thisPeer) return;
+      hostOpened = true;
       var url = location.origin + location.pathname + '#' + roomId;
       $('qr').innerHTML = '';
       if (window.QRCode) new QRCode($('qr'), { text: url, width: 220, height: 220, colorDark: '#17232e', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
@@ -1105,11 +1128,19 @@
     var thisPeer;
     try { thisPeer = peer = new Peer(undefined, B.peerOptions(settings)); }
     catch (e) { setStatus($('join-status'), 'Could not start: ' + e.message, 'warn'); return; }
+    var opened = false;
+    var signalTimer = setTimeout(function () {
+      if (peer === thisPeer && !opened) {
+        setStatus($('join-status'), 'Cannot reach the signaling server (0.peerjs.com). An ad blocker, VPN, or firewall may be blocking it. Check Settings > Connection > Test.', 'warn');
+        $('join-form').classList.remove('hidden');
+      }
+    }, 10000);
     var connectTimer = setTimeout(function () {
-      if (peer === thisPeer && guestLink && !guestLink.ready) setStatus($('join-status'), 'Still connecting. If this takes long, both devices may need a TURN server (Settings > Connection).', 'busy');
-    }, 12000);
+      if (peer === thisPeer && guestLink && !guestLink.ready) setStatus($('join-status'), 'Still trying to reach the other device. Make sure the host page is still open, then wait a little; if nothing happens, a TURN server may be needed (Settings > Connection).', 'busy');
+    }, 15000);
     thisPeer.on('open', function () {
       if (peer !== thisPeer) return;
+      opened = true; clearTimeout(signalTimer);
       var c = thisPeer.connect(code, { reliable: true, serialization: 'raw' });
       var link = makeLink(c);
       links[link.id] = link; guestLink = link;
@@ -1121,7 +1152,7 @@
     thisPeer.on('disconnected', function () { if (peer === thisPeer && !thisPeer.destroyed) thisPeer.reconnect(); });
     thisPeer.on('error', function (e) {
       if (peer !== thisPeer) return;
-      clearTimeout(connectTimer);
+      clearTimeout(connectTimer); clearTimeout(signalTimer);
       if (e.type === 'peer-unavailable') setStatus($('join-status'), 'No room with that code. It may have expired; ask for a new one.', 'warn');
       else setStatus($('join-status'), 'Could not connect: ' + e.type, 'warn');
       $('join-form').classList.remove('hidden');

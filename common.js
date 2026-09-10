@@ -34,7 +34,10 @@
     chunk: 32768,
     host: '', port: '', path: '', key: '',
     secure: 'auto',           // auto | yes | no
-    ice: JSON.stringify([{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }], null, 2)
+    ice: JSON.stringify([
+      { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+      { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turns:openrelay.metered.ca:443'], username: 'openrelayproject', credential: 'openrelayproject' }
+    ], null, 2)
   };
 
   function load() {
@@ -45,6 +48,7 @@
     // Older versions stored the guessed name; treat it as the default so a new device keeps auto-naming.
     if (typeof s.name !== 'string') s.name = '';
     s.chunk = parseInt(s.chunk, 10) || DEFAULTS.chunk;
+    if (typeof s.ice === 'string' && /^\s*\[\s*\{\s*"urls"\s*:\s*\[\s*"stun:stun\.l\.google\.com:19302"\s*,\s*"stun:stun1\.l\.google\.com:19302"\s*\]\s*\}\s*\]\s*$/.test(s.ice)) s.ice = DEFAULTS.ice;
     return s;
   }
 

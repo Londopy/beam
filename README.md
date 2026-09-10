@@ -104,9 +104,10 @@ Settings; see "Self-hosting the signaling server" below.
 
 ## Limitations and caveats
 
-* Cross-network connections rely on STUN. Devices behind a symmetric NAT or a
-strict corporate firewall may fail to connect. Add a TURN server under
-Settings > ICE servers to fix that.
+* Cross-network connections use STUN first and fall back to the free public
+Open Relay TURN server (openrelay.metered.ca). That relay is a community
+service with no uptime promise; for anything important, add your own TURN
+server under Settings > Connection.
 * Except on Chromium desktop with a save folder set, received files are held
 in memory until you tap Save. Very large files on a phone can crash the
 tab. Stream-to-disk is the fix where available.
