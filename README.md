@@ -1,8 +1,8 @@
 # Beam
 
 Send files and text between your devices, browser to browser, by scanning a
-QR code. No accounts, no uploads, no server of your own. It is a single
-`index.html` that runs on GitHub Pages.
+QR code. No accounts, no uploads, no server of your own. It is a handful of
+static files (no build step) that run on GitHub Pages.
 
 Open the page on one device, scan the QR code with another, and drop files in
 either direction. Data travels over a direct WebRTC connection between the two
@@ -26,6 +26,11 @@ to everyone.
 * Optional PIN to join (shown next to the QR, never included in the link),
 lock the room against new joins, disconnect individual devices, and a
 device name you can edit.
+* Optional stable room code: keep the same code and QR across reloads so a
+printed or bookmarked link keeps working. New code rotates it.
+* Tap the QR to enlarge it, tap the code to copy it, Share link on phones.
+* Each connected device shows whether the link is direct, on the same
+network, or going through a TURN relay.
 
 Sending
 
@@ -35,7 +40,11 @@ kept), plain text, links, and anything pasted with Ctrl+V anywhere on the
 page, including images from the clipboard.
 * Pause, resume, and cancel from either side. Files queue up if nothing is
 connected yet. Live speed and time remaining. CRC32 checked on arrival and a
-Delivered confirmation sent back.
+Delivered confirmation sent back. Failed, declined, or cancelled items get a
+Send again button.
+* Send clipboard button sends whatever is on the clipboard (text or an image).
+* The tab title shows transfer progress and the screen stays awake while a
+transfer runs (where the browser allows it).
 
 Receiving
 
@@ -45,12 +54,17 @@ Save all as zip, and Remove.
 * Inline previews for images, video, audio, and small text files.
 * Chromium desktop: choose a folder once and files stream straight to disk
 with no memory limit.
-* Browser notifications when the tab is in the background.
+* Optional automatic download when a file finishes, browser notifications
+when the tab is in the background, and an optional chime.
 
-Settings (saved in localStorage)
+Settings (its own page, `settings.html`, saved in localStorage)
 
-* Chunk size, a custom PeerJS signaling server, ICE / TURN servers as JSON.
-* Follows the system light / dark theme.
+* Device name, light / dark / system theme, PIN, stable code, auto-accept,
+auto-download, previews, notifications, sound.
+* Chunk size, a custom PeerJS signaling server (with a Test button), ICE /
+TURN servers as JSON.
+* Export and import settings as JSON, reset to defaults. Changes apply to an
+open Beam tab immediately.
 
 ## Deploy to GitHub Pages
 
@@ -74,7 +88,9 @@ clipboard, and File System Access APIs require a secure context.
 ## How it works
 
 * `index.html` loads three libraries from cdnjs: PeerJS (WebRTC wrapper),
-qrcode.js (QR rendering), and JSZip (Save all as zip).
+qrcode.js (QR rendering), and JSZip (Save all as zip). `common.js` holds the
+settings storage and theme code shared with `settings.html`; `beam.css` is
+the shared stylesheet.
 * The host creates a PeerJS peer with a random 10-character id and shows a
 QR code of `<page-url>#<id>`. A guest opens that URL, connects with a
 reliable ordered data channel, and sends a `hello` message with its device
@@ -128,7 +144,10 @@ servers JSON in Settings, for example:
 
 ## Repository layout
 
-&#x20;   index.html                    the full app
+&#x20;   index.html                    the app
+    settings.html                 the settings page
+    common.js                     settings storage and theme, shared
+    beam.css                      stylesheet, shared
     basic/index.html              the original one-way, one-file version
     .github/workflows/pages.yml   GitHub Pages deployment
     .nojekyll                     tells Pages not to run Jekyll

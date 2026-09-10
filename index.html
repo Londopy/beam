@@ -3,168 +3,54 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#eef1ee">
+<meta name="theme-color" content="#f3f5f2">
+<meta name="description" content="Send files and text between your devices, browser to browser, by scanning a QR code.">
 <title>Beam - share files between devices</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="beam.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231f7a55'/%3E%3Cpath d='M9 16h14M17 10l6 6-6 6' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
+<script src="common.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<style>
-  :root {
-    --bg: #eef1ee;
-    --panel: #ffffff;
-    --ink: #17232e;
-    --muted: #66737e;
-    --line: #cfd6d2;
-    --chip: #f3f5f3;
-    --go: #2b6b4e;
-    --go-soft: #dcefe4;
-    --warn: #9a3b2c;
-    --warn-soft: #f6e3de;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #141a17;
-      --panel: #1d2521;
-      --ink: #e6ebe8;
-      --muted: #9aa5a0;
-      --line: #334039;
-      --chip: #25302a;
-      --go: #6fc59a;
-      --go-soft: #22392e;
-      --warn: #e8907c;
-      --warn-soft: #3d2620;
-    }
-  }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; background: var(--bg); color: var(--ink); }
-  body {
-    font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-    font-size: 16px;
-    line-height: 1.5;
-    -webkit-font-smoothing: antialiased;
-  }
-  main { max-width: 640px; margin: 0 auto; padding: 32px 20px 64px; }
-  .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 24px; }
-  h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
-  h2 { font-size: 17px; font-weight: 600; margin: 0 0 12px; }
-  .lede { color: var(--muted); margin: 2px 0 0; }
-  .me { text-align: right; font-size: 14px; color: var(--muted); flex-shrink: 0; }
-  .me b { display: block; color: var(--ink); font-weight: 500; }
-  .panel {
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 16px;
-  }
-  .qr-wrap { display: flex; flex-direction: column; align-items: center; text-align: center; }
-  #qr { width: 232px; height: 232px; display: flex; align-items: center; justify-content: center; padding: 6px; background: #fff; border-radius: 6px; }
-  #qr img, #qr canvas { display: block; }
-  .placeholder { width: 220px; height: 220px; border: 2px dashed #cfd6d2; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #66737e; font-size: 14px; }
-  .code { font-size: 24px; letter-spacing: 0.12em; font-weight: 600; margin-top: 12px; font-variant-numeric: tabular-nums; }
-  .pin { margin-top: 4px; font-size: 15px; }
-  .pin b { letter-spacing: 0.2em; }
-  .status { margin: 12px 0 0; font-weight: 500; }
-  .status.go { color: var(--go); }
-  .status.warn { color: var(--warn); }
-  .link { margin-top: 6px; font-size: 13px; color: var(--muted); word-break: break-all; user-select: all; }
-  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; align-items: center; }
-  .row.center { justify-content: center; }
-  button, .btn {
-    font: inherit; font-size: 15px; padding: 8px 14px; border-radius: 8px;
-    border: 1px solid var(--line); background: var(--panel); color: var(--ink);
-    cursor: pointer; text-decoration: none; display: inline-block; line-height: 1.3;
-  }
-  button:hover, .btn:hover { border-color: var(--ink); }
-  button:disabled { opacity: 0.5; cursor: default; }
-  button:focus-visible, .btn:focus-visible, .drop:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
-    outline: 3px solid var(--go); outline-offset: 2px;
-  }
-  .primary { background: var(--go); border-color: var(--go); color: #fff; }
-  .primary:hover { filter: brightness(0.92); }
-  .small { font-size: 13px; padding: 5px 10px; }
-  .danger { color: var(--warn); }
-  input[type="text"], input[type="number"], input[type="password"], textarea, select {
-    font: inherit; font-size: 15px; padding: 8px 10px; border-radius: 8px;
-    border: 1px solid var(--line); background: var(--panel); color: var(--ink); width: 100%;
-  }
-  textarea { resize: vertical; min-height: 64px; }
-  label.field { display: block; margin-top: 12px; font-size: 14px; color: var(--muted); }
-  label.field span { display: block; margin-bottom: 4px; }
-  label.check { display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; font-size: 15px; cursor: pointer; }
-  label.check input { margin-top: 5px; }
-  label.check small { display: block; color: var(--muted); font-size: 13px; }
-  .drop {
-    border: 2px dashed var(--line); border-radius: 12px; padding: 24px 20px; text-align: center;
-    color: var(--muted); cursor: pointer; transition: background 120ms, border-color 120ms;
-  }
-  .drop.over { background: var(--go-soft); border-color: var(--go); color: var(--go); }
-  .drop strong { color: var(--ink); font-weight: 500; }
-  input[type="file"] { display: none; }
-  ul.list { list-style: none; margin: 12px 0 0; padding: 0; }
-  ul.list li { padding: 12px 0; border-top: 1px solid var(--line); }
-  ul.list li:first-child { border-top: 0; padding-top: 0; }
-  .fname { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
-  .fname .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .fname .n small { color: var(--muted); }
-  .fsize { color: var(--muted); font-size: 14px; flex-shrink: 0; }
-  .bar { height: 6px; border-radius: 3px; background: var(--line); margin-top: 8px; overflow: hidden; }
-  .bar i { display: block; height: 100%; width: 0; background: var(--go); transition: width 120ms linear; }
-  .fstate { font-size: 14px; color: var(--muted); margin-top: 6px; }
-  .fstate.go { color: var(--go); }
-  .fstate.warn { color: var(--warn); }
-  .actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
-  .preview { margin-top: 10px; max-width: 100%; }
-  .preview img, .preview video { max-width: 100%; max-height: 260px; border-radius: 8px; display: block; }
-  .preview audio { width: 100%; }
-  .textmsg { white-space: pre-wrap; word-break: break-word; background: var(--chip); border-radius: 8px; padding: 10px 12px; margin-top: 8px; font-size: 15px; }
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-  .chip { background: var(--chip); border-radius: 999px; padding: 6px 12px; font-size: 14px; display: inline-flex; gap: 8px; align-items: center; }
-  .chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--go); }
-  .chip button { padding: 0 4px; border: 0; background: none; color: var(--muted); font-size: 13px; }
-  .note { font-size: 13px; color: var(--muted); margin: 12px 0 0; }
-  .hidden { display: none !important; }
-  .stats { font-size: 13px; color: var(--muted); text-align: center; margin-top: 8px; }
-  .toast {
-    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
-    background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 8px;
-    font-size: 14px; opacity: 0; pointer-events: none; transition: opacity 160ms; max-width: 90vw;
-  }
-  .toast.show { opacity: 1; }
-  #scan-video { width: 100%; max-height: 320px; border-radius: 8px; background: #000; margin-top: 12px; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
-  @media (max-width: 480px) { .grid2 { grid-template-columns: 1fr; } .top { flex-direction: column; } .me { text-align: left; } }
-  @media (prefers-reduced-motion: reduce) { .bar i, .drop, .toast { transition: none; } }
-</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
 </head>
 <body>
 <main>
   <header class="top">
-    <div>
-      <h1>Beam</h1>
-      <p class="lede" id="lede">Share files and text between devices, browser to browser.</p>
-    </div>
-    <div class="me">
-      This device
-      <b id="me-name">Device</b>
-      <button type="button" class="small" id="settings-btn" style="margin-top:6px">Settings</button>
+    <a class="brand" href="./" aria-label="Beam">
+      <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></span>
+      <span><h1>Beam</h1><small id="lede">Share files between devices, browser to browser.</small></span>
+    </a>
+    <div class="top-actions">
+      <div class="me">This device<b id="me-name">Device</b></div>
+      <a class="btn icon-btn" href="settings.html" aria-label="Settings" title="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </a>
     </div>
   </header>
 
+  <div class="seg-wrap">
+    <div class="seg" role="group" aria-label="Mode">
+      <button type="button" id="mode-host" aria-pressed="true">Host a room</button>
+      <button type="button" id="mode-join" aria-pressed="false">Join a room</button>
+    </div>
+  </div>
+
   <!-- Host: room code -->
   <section id="room" class="panel qr-wrap hidden">
-    <div id="qr"><div class="placeholder">Making your code</div></div>
-    <div class="code" id="room-code"></div>
+    <div id="qr" title="Tap to enlarge" role="button" tabindex="0" aria-label="Show a larger QR code"><div class="placeholder">Making your code</div></div>
+    <div class="code" id="room-code" title="Click to copy"></div>
     <div class="pin hidden" id="room-pin">PIN <b id="pin-value"></b></div>
-    <p class="status" id="room-status">Connecting</p>
+    <p class="status busy" id="room-status">Connecting</p>
     <div class="link" id="room-link"></div>
     <div class="row center">
       <button type="button" id="copy-link">Copy link</button>
+      <button type="button" id="share-link" class="hidden">Share link</button>
       <button type="button" id="new-code">New code</button>
       <button type="button" id="lock-room">Lock room</button>
-      <button type="button" id="to-join">Join a code instead</button>
     </div>
-    <div id="devices" class="hidden" style="width:100%;margin-top:16px;text-align:left">
+    <div id="devices" class="hidden" style="width:100%;margin-top:18px;text-align:left">
       <h2>Connected devices</h2>
       <div class="chips" id="device-chips"></div>
     </div>
@@ -176,20 +62,19 @@
     <p class="status" id="join-status" style="margin-top:0"></p>
     <div id="join-form">
       <label class="field"><span>Code or link from the other device</span>
-        <input type="text" id="join-code" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="abcde-fghij">
+        <input type="text" id="join-code" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="abcde-fghij" inputmode="text">
       </label>
       <div class="row">
         <button type="button" class="primary" id="join-btn">Connect</button>
         <button type="button" id="scan-btn" class="hidden">Scan a QR code</button>
-        <button type="button" id="to-host">Host a room instead</button>
       </div>
       <video id="scan-video" class="hidden" playsinline muted></video>
     </div>
     <div id="pin-form" class="hidden">
       <label class="field"><span>This room needs a PIN. Ask the host for it.</span>
-        <input type="password" id="pin-input" inputmode="numeric" maxlength="8" autocomplete="off">
+        <input type="password" id="pin-input" inputmode="numeric" maxlength="8" autocomplete="one-time-code">
       </label>
-      <div class="row"><button type="button" class="primary" id="pin-btn">Unlock</button></div>
+      <div class="row"><button type="button" class="primary" id="pin-btn">Unlock</button><button type="button" id="pin-cancel">Cancel</button></div>
     </div>
     <div class="row" id="join-connected">
       <button type="button" id="leave-btn" class="hidden">Leave</button>
@@ -198,84 +83,68 @@
 
   <!-- Send -->
   <section id="send" class="panel hidden">
-    <h2>Send</h2>
+    <div class="panel-head">
+      <h2>Send</h2>
+      <label id="target-wrap" class="hidden" style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)">
+        To <select id="target" style="width:auto;padding:5px 8px;font-size:13px"></select>
+      </label>
+    </div>
     <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose files to send">
-      <strong>Drop files or folders here</strong> or click to choose
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+      <strong>Drop files or folders here</strong><br>or click to choose
     </div>
     <input type="file" id="picker" multiple>
     <input type="file" id="folder-picker" webkitdirectory>
-    <div class="row">
-      <button type="button" id="pick-folder">Choose a folder</button>
-      <label id="target-wrap" class="hidden" style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted)">
-        Send to <select id="target" style="width:auto"></select>
-      </label>
+    <div class="row tight">
+      <button type="button" id="pick-folder" class="small">Choose a folder</button>
+      <button type="button" id="send-clip" class="small">Send clipboard</button>
+      <span class="note" style="margin:0">Paste anywhere on the page to add files or text.</span>
     </div>
-    <label class="field"><span>Text, link, or clipboard</span>
-      <textarea id="text-input" placeholder="Paste anything here and send it"></textarea>
+    <label class="field"><span>Text or link</span>
+      <textarea id="text-input" placeholder="Paste anything here and send it" rows="2"></textarea>
     </label>
-    <div class="row">
+    <div class="row tight">
       <button type="button" class="primary" id="send-text">Send text</button>
-      <span class="note" style="margin:0">Ctrl+Enter sends. Pasting files anywhere on the page adds them.</span>
+      <span class="note" style="margin:0"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> sends</span>
     </div>
     <ul class="list" id="out-list"></ul>
+    <div class="row tight hidden" id="out-tools">
+      <button type="button" id="clear-out" class="small ghost">Clear finished</button>
+    </div>
   </section>
 
   <!-- Received -->
   <section id="recv" class="panel hidden">
-    <h2>Received</h2>
-    <ul class="list" id="in-list"></ul>
-    <p class="note" id="recv-empty">Nothing yet. Files and text from other devices show up here.</p>
-    <div class="row">
-      <button type="button" id="zip-all" class="hidden">Save all as zip</button>
-      <button type="button" id="clear-recv" class="hidden">Clear</button>
-    </div>
-  </section>
-
-  <!-- Settings -->
-  <section id="settings" class="panel hidden">
-    <h2>Settings</h2>
-    <label class="field"><span>Device name</span><input type="text" id="set-name" maxlength="40"></label>
-    <label class="check"><input type="checkbox" id="set-auto"><span>Accept incoming files automatically<small>Off means each file waits for you to tap Accept.</small></span></label>
-    <label class="check"><input type="checkbox" id="set-notify"><span>Notify me when something arrives<small>Uses browser notifications when this tab is in the background.</small></span></label>
-    <label class="check"><input type="checkbox" id="set-pin"><span>Require a PIN to join my room<small>The PIN is shown next to the QR code and is never in the link.</small></span></label>
-    <label class="check"><input type="checkbox" id="set-preview" checked><span>Show previews of received images, video, and audio</span></label>
-    <div id="folder-setting" class="hidden">
-      <label class="field"><span>Save received files straight to a folder (no memory limit, Chromium desktop only)</span></label>
-      <div class="row" style="margin-top:6px">
-        <button type="button" id="set-folder">Choose folder</button>
-        <span id="folder-name" class="note" style="margin:0">Not set. Files are kept in memory until you tap Save.</span>
-        <button type="button" id="clear-folder" class="small hidden">Stop</button>
+    <div class="panel-head">
+      <h2>Received<span class="count" id="recv-count"></span></h2>
+      <div class="row" style="margin:0">
+        <button type="button" id="zip-all" class="small hidden">Save all as zip</button>
+        <button type="button" id="clear-recv" class="small ghost hidden">Clear</button>
       </div>
     </div>
-    <label class="field"><span>Chunk size</span>
-      <select id="set-chunk">
-        <option value="16384">16 KB (safest)</option>
-        <option value="32768">32 KB</option>
-        <option value="65536">64 KB (faster)</option>
-        <option value="131072">128 KB (Chromium only)</option>
-      </select>
-    </label>
-    <h2 style="margin-top:20px">Advanced</h2>
-    <p class="note" style="margin-top:0">Leave blank to use the free public PeerJS signaling server. Only connection setup goes through it; file data goes device to device.</p>
-    <div class="grid2">
-      <label class="field"><span>Signaling host</span><input type="text" id="set-host" placeholder="0.peerjs.com"></label>
-      <label class="field"><span>Port</span><input type="number" id="set-port" placeholder="443"></label>
-      <label class="field"><span>Path</span><input type="text" id="set-path" placeholder="/"></label>
-      <label class="field"><span>Key</span><input type="text" id="set-key" placeholder="peerjs"></label>
+    <ul class="list" id="in-list"></ul>
+    <p class="empty" id="recv-empty">Nothing yet. Files and text from other devices show up here.</p>
+    <p class="note hidden" id="folder-note"></p>
+    <div class="row tight hidden" id="folder-row">
+      <button type="button" id="set-folder" class="small">Save straight to a folder</button>
+      <button type="button" id="clear-folder" class="small hidden">Stop saving to folder</button>
     </div>
-    <label class="field"><span>ICE servers (JSON array). Add a TURN server if devices on different networks cannot connect.</span>
-      <textarea id="set-ice" spellcheck="false"></textarea>
-    </label>
-    <div class="row">
-      <button type="button" class="primary" id="save-settings">Save</button>
-      <button type="button" id="reset-settings">Reset to defaults</button>
-      <button type="button" id="close-settings">Close</button>
-    </div>
-    <p class="note">Connection settings take effect the next time a room is created or joined.</p>
   </section>
 
-  <footer class="stats" id="stats"></footer>
+  <footer>
+    <div class="stats" id="stats"></div>
+    <p class="foot"><a href="settings.html">Settings</a><span id="route-note"></span></p>
+  </footer>
 </main>
+
+<div class="modal hidden" id="qr-modal" role="dialog" aria-modal="true" aria-label="Room QR code">
+  <div class="sheet">
+    <div id="qr-big"></div>
+    <div class="code" id="qr-big-code"></div>
+    <button type="button" class="close" id="qr-modal-close">Close</button>
+  </div>
+</div>
+<div class="drop-overlay hidden" id="drop-overlay">Drop to send</div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -286,16 +155,14 @@
   // Helpers
   // -------------------------------------------------------------------
   var $ = function (id) { return document.getElementById(id); };
+  var B = window.Beam;
+  var fmtBytes = B.fmtBytes, toast = B.toast;
   var HIGH_WATER = 4 * 1024 * 1024;
+  var LOW_WATER = 1024 * 1024;
   var PREVIEW_IMAGE_MAX = 25 * 1024 * 1024;
   var PREVIEW_MEDIA_MAX = 300 * 1024 * 1024;
+  var ROOM_KEY = 'beam.room';
 
-  function fmtBytes(n) {
-    if (n < 1024) return n + ' B';
-    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
-    if (n < 1073741824) return (n / 1048576).toFixed(1) + ' MB';
-    return (n / 1073741824).toFixed(2) + ' GB';
-  }
   function fmtTime(sec) {
     if (!isFinite(sec) || sec < 0) return '';
     if (sec < 60) return Math.ceil(sec) + 's';
@@ -332,26 +199,23 @@
     });
   }
   function isUrl(t) { return /^https?:\/\/\S+$/i.test(t.trim()); }
-  function guessDevice() {
-    var ua = navigator.userAgent;
-    var os = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android'
-      : /Windows/.test(ua) ? 'Windows' : /Mac/.test(ua) ? 'Mac' : /CrOS/.test(ua) ? 'ChromeOS' : /Linux/.test(ua) ? 'Linux' : 'device';
-    var br = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Firefox\//.test(ua) ? 'Firefox'
-      : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Browser';
-    return br + ' on ' + os;
-  }
-  var toastTimer = null;
-  function toast(msg) {
-    var t = $('toast');
-    t.textContent = msg;
-    t.classList.add('show');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2200);
-  }
   function setStatus(el, text, cls) {
     el.textContent = text;
     el.className = 'status' + (cls ? ' ' + cls : '');
   }
+  function copyText(text, okMsg) {
+    if (!navigator.clipboard) { toast('Clipboard not available here'); return; }
+    navigator.clipboard.writeText(text).then(function () { toast(okMsg || 'Copied'); }, function () { toast('Could not copy'); });
+  }
+  function extOf(name) { var m = /\.([a-z0-9]{1,5})$/i.exec(name || ''); return m ? m[1].toLowerCase() : ''; }
+  var MIME_BY_EXT = {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp', svg: 'image/svg+xml', avif: 'image/avif', heic: 'image/heic',
+    mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', m4v: 'video/mp4', mkv: 'video/x-matroska',
+    mp3: 'audio/mpeg', m4a: 'audio/mp4', wav: 'audio/wav', ogg: 'audio/ogg', flac: 'audio/flac', opus: 'audio/ogg',
+    txt: 'text/plain', md: 'text/plain', log: 'text/plain', csv: 'text/plain', json: 'text/plain', pdf: 'application/pdf'
+  };
+  function guessMime(name, given) { return given || MIME_BY_EXT[extOf(name)] || ''; }
+  function chime() { if (settings.sound) B.chime(); }
 
   // CRC32, incremental
   var CRC_TABLE = (function () {
@@ -364,8 +228,14 @@
     return t;
   })();
   function crcUpdate(crc, buf) {
-    var u = new Uint8Array(buf);
-    for (var i = 0; i < u.length; i++) crc = CRC_TABLE[(crc ^ u[i]) & 0xFF] ^ (crc >>> 8);
+    var u = new Uint8Array(buf), n = u.length, i = 0;
+    for (; i + 4 <= n; i += 4) {
+      crc = CRC_TABLE[(crc ^ u[i]) & 0xFF] ^ (crc >>> 8);
+      crc = CRC_TABLE[(crc ^ u[i + 1]) & 0xFF] ^ (crc >>> 8);
+      crc = CRC_TABLE[(crc ^ u[i + 2]) & 0xFF] ^ (crc >>> 8);
+      crc = CRC_TABLE[(crc ^ u[i + 3]) & 0xFF] ^ (crc >>> 8);
+    }
+    for (; i < n; i++) crc = CRC_TABLE[(crc ^ u[i]) & 0xFF] ^ (crc >>> 8);
     return crc;
   }
   function crcFinal(crc) { return (crc ^ -1) >>> 0; }
@@ -377,7 +247,8 @@
   Meter.prototype.update = function (bytes) {
     var now = Date.now();
     if (now - this.lastT >= 500) {
-      this.rate = (bytes - this.lastB) / ((now - this.lastT) / 1000);
+      var inst = (bytes - this.lastB) / ((now - this.lastT) / 1000);
+      this.rate = this.rate ? this.rate * 0.6 + inst * 0.4 : inst;
       this.lastT = now; this.lastB = bytes;
     }
     var left = this.rate > 0 ? (this.total - bytes) / this.rate : Infinity;
@@ -387,68 +258,31 @@
   };
 
   // -------------------------------------------------------------------
-  // Settings
+  // Settings (edited on settings.html, stored in localStorage)
   // -------------------------------------------------------------------
-  var DEFAULTS = {
-    name: guessDevice(),
-    autoAccept: true,
-    notify: false,
-    pin: false,
-    preview: true,
-    chunk: 32768,
-    host: '', port: '', path: '', key: '',
-    ice: JSON.stringify([{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }], null, 2)
-  };
-  var settings = {};
-  function loadSettings() {
-    var saved = {};
-    try { saved = JSON.parse(localStorage.getItem('beam.settings') || '{}'); } catch (e) { saved = {}; }
-    for (var k in DEFAULTS) settings[k] = (k in saved) ? saved[k] : DEFAULTS[k];
-  }
-  function persistSettings() {
-    try { localStorage.setItem('beam.settings', JSON.stringify(settings)); } catch (e) { /* private mode etc. */ }
-  }
-  function settingsToForm() {
-    $('set-name').value = settings.name;
-    $('set-auto').checked = !!settings.autoAccept;
-    $('set-notify').checked = !!settings.notify;
-    $('set-pin').checked = !!settings.pin;
-    $('set-preview').checked = !!settings.preview;
-    $('set-chunk').value = String(settings.chunk);
-    $('set-host').value = settings.host; $('set-port').value = settings.port;
-    $('set-path').value = settings.path; $('set-key').value = settings.key;
-    $('set-ice').value = settings.ice;
-  }
-  function formToSettings() {
-    settings.name = $('set-name').value.trim() || guessDevice();
-    settings.autoAccept = $('set-auto').checked;
-    settings.notify = $('set-notify').checked;
-    settings.pin = $('set-pin').checked;
-    settings.preview = $('set-preview').checked;
-    settings.chunk = parseInt($('set-chunk').value, 10) || 32768;
-    settings.host = $('set-host').value.trim(); settings.port = $('set-port').value.trim();
-    settings.path = $('set-path').value.trim(); settings.key = $('set-key').value.trim();
-    try { JSON.parse($('set-ice').value); settings.ice = $('set-ice').value; }
-    catch (e) { toast('ICE servers must be a JSON array; keeping the previous value'); }
-    persistSettings();
-    $('me-name').textContent = settings.name;
-    if (settings.notify && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission();
-    if (mode === 'host') {
-      roomPin = settings.pin ? randomPin() : null;
+  var settings = B.load();
+  function myName() { return B.displayName(settings); }
+  function refreshSettings() {
+    var old = settings;
+    settings = B.load();
+    B.applyTheme(settings.theme);
+    $('me-name').textContent = myName();
+    if (B.displayName(old) !== myName()) for (var k in links) sendJson(links[k], { type: 'rename', name: myName() });
+    if (mode === 'host' && !!old.pin !== !!settings.pin) {
+      roomPin = settings.pin ? (loadRoom().pin || randomPin()) : null;
+      if (settings.stableCode) saveRoom();
       renderPin();
     }
   }
-  function peerOptions() {
-    var o = { debug: 1 };
-    if (settings.host) {
-      o.host = settings.host;
-      o.port = settings.port ? parseInt(settings.port, 10) : 443;
-      o.path = settings.path || '/';
-      o.secure = o.port === 443;
-      if (settings.key) o.key = settings.key;
-    }
-    try { o.config = { iceServers: JSON.parse(settings.ice) }; } catch (e) { /* default */ }
-    return o;
+  window.addEventListener('storage', function (e) { if (e.key === B.STORAGE_KEY) refreshSettings(); });
+  window.addEventListener('pageshow', function () { refreshSettings(); });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) refreshSettings(); });
+
+  function loadRoom() {
+    try { return JSON.parse(localStorage.getItem(ROOM_KEY) || '{}') || {}; } catch (e) { return {}; }
+  }
+  function saveRoom() {
+    try { localStorage.setItem(ROOM_KEY, JSON.stringify({ id: roomId, pin: roomPin })); } catch (e) { /* ignore */ }
   }
 
   // -------------------------------------------------------------------
@@ -461,12 +295,12 @@
   var roomLocked = false;
   var links = {};          // peerId -> link
   var guestLink = null;    // guest side: the single link to the host
-  var unassigned = [];     // items queued before any device connected (host)
+  var unassigned = [];     // items queued before any device connected
   var received = [];       // in-memory received files (for zip)
   var dirHandle = null;
   var stats = { sent: 0, recv: 0, filesSent: 0, filesRecv: 0 };
   var idCounter = 0;
-  var pendingJoinCode = null;
+  var wakeLock = null;
 
   function nextId() { return 't' + (++idCounter) + randomId(4); }
   function linkCount() { return Object.keys(links).length; }
@@ -480,31 +314,73 @@
       ', received ' + fmtBytes(stats.recv) + ' in ' + stats.filesRecv + ' item' + (stats.filesRecv === 1 ? '' : 's') + '.';
   }
 
+  // Keep the screen on while transferring; show progress in the tab title.
+  var baseTitle = document.title;
+  function updateActivity() {
+    var active = activeTransfers() > 0;
+    if (active && !wakeLock && navigator.wakeLock && !document.hidden) {
+      navigator.wakeLock.request('screen').then(function (l) { wakeLock = l; l.addEventListener('release', function () { wakeLock = null; }); }).catch(function () {});
+    } else if (!active && wakeLock) {
+      wakeLock.release().catch(function () {}); wakeLock = null;
+    }
+    if (!active) document.title = baseTitle;
+  }
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) updateActivity(); });
+  var titleTimer = 0;
+  function titleProgress(done, total) {
+    var now = Date.now();
+    if (now - titleTimer < 500) return;
+    titleTimer = now;
+    document.title = (total ? Math.round(done / total * 100) : 0) + '% - Beam';
+  }
+
   // -------------------------------------------------------------------
   // Rows
   // -------------------------------------------------------------------
-  function fileRow(list, name, sub, size) {
+  var ICONS = {
+    text: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
+    link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>',
+    file: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>'
+  };
+  function fileRow(list, name, sub, size, kind) {
     var li = document.createElement('li');
     li.innerHTML =
+      '<div class="ficon"></div>' +
       '<div class="fname"><span class="n"></span><span class="fsize"></span></div>' +
       '<div class="bar"><i></i></div>' +
       '<div class="fstate"></div>' +
       '<div class="preview"></div>' +
       '<div class="actions"></div>';
+    var icon = li.querySelector('.ficon');
+    if (kind === 'text' || kind === 'link') icon.innerHTML = ICONS[kind];
+    else { var ext = extOf(name); if (ext && ext.length <= 4) icon.textContent = ext.toUpperCase(); else icon.innerHTML = ICONS.file; }
     var n = li.querySelector('.n');
     n.textContent = name;
     if (sub) { var s = document.createElement('small'); s.textContent = ' ' + sub; n.appendChild(s); }
     li.querySelector('.fsize').textContent = size == null ? '' : fmtBytes(size);
     list.insertBefore(li, list.firstChild);
-    return {
+    var lastPaint = 0;
+    var row = {
       li: li,
       bar: li.querySelector('.bar'),
       fill: li.querySelector('.bar i'),
       state: li.querySelector('.fstate'),
       preview: li.querySelector('.preview'),
       actions: li.querySelector('.actions'),
-      setProgress: function (done, total) { this.fill.style.width = (total ? Math.min(100, Math.round(done / total * 100)) : 0) + '%'; },
-      setState: function (text, cls) { this.state.textContent = text; this.state.className = 'fstate' + (cls ? ' ' + cls : ''); },
+      finished: false,
+      setProgress: function (done, total, text) {
+        var now = Date.now();
+        if (done < total && now - lastPaint < 80) return;
+        lastPaint = now;
+        this.fill.style.width = (total ? Math.min(100, Math.round(done / total * 100)) : 0) + '%';
+        if (text != null) this.state.textContent = text;
+        titleProgress(done, total);
+      },
+      setState: function (text, cls) {
+        this.state.textContent = text; this.state.className = 'fstate' + (cls ? ' ' + cls : '');
+        if (cls === 'go') { this.bar.classList.add('done'); this.finished = true; }
+        if (cls === 'warn') { this.bar.classList.add('warn'); this.finished = true; }
+      },
       setSub: function (text) { var s = n.querySelector('small'); if (!s) { s = document.createElement('small'); n.appendChild(s); } s.textContent = ' ' + text; },
       button: function (label, cls, onclick) {
         var b = document.createElement('button');
@@ -515,6 +391,7 @@
       },
       clearActions: function () { this.actions.innerHTML = ''; }
     };
+    return row;
   }
 
   // -------------------------------------------------------------------
@@ -522,8 +399,8 @@
   // -------------------------------------------------------------------
   function makeLink(conn) {
     var link = {
-      id: conn.peer, conn: conn, name: 'Device', ready: false,
-      queue: [], sending: null, incoming: null, bytesIn: 0, bytesOut: 0
+      id: conn.peer, conn: conn, name: 'Device', ready: false, route: '',
+      queue: [], sending: null, incoming: null, pending: {}, sentById: {}, bytesIn: 0, bytesOut: 0
     };
     conn.on('data', function (d) { onData(link, d); });
     conn.on('close', function () { onLinkClose(link); });
@@ -532,23 +409,29 @@
   }
 
   function sendJson(link, obj) {
-    if (link.conn && link.conn.open) link.conn.send(JSON.stringify(obj));
+    if (link.conn && link.conn.open) { try { link.conn.send(JSON.stringify(obj)); } catch (e) { console.warn('send failed', e); } }
   }
 
   function onLinkClose(link) {
-    if (link.sending) { link.sending.row.setState('Stopped: ' + link.name + ' disconnected', 'warn'); link.sending = null; }
-    link.queue.forEach(function (it) { it.row.setState('Stopped: ' + link.name + ' disconnected', 'warn'); });
+    var why = 'Stopped: ' + link.name + ' disconnected';
+    if (link.sending) { link.sending.row.setState(why, 'warn'); addRetry(link.sending); link.sending = null; }
+    link.queue.forEach(function (it) { it.row.setState(why, 'warn'); addRetry(it); });
     link.queue = [];
-    if (link.incoming) { link.incoming.row.setState('Stopped: ' + link.name + ' disconnected', 'warn'); abortIncoming(link.incoming); link.incoming = null; }
+    if (link.incoming) { link.incoming.row.setState(why, 'warn'); link.incoming.row.clearActions(); abortIncoming(link.incoming); link.incoming = null; }
+    for (var id in link.pending) { link.pending[id].row.setState(why, 'warn'); link.pending[id].row.clearActions(); }
+    link.pending = {};
     delete links[link.id];
+    updateActivity();
     if (mode === 'host') {
       renderDevices();
       if (linkCount() === 0) setStatus($('room-status'), 'Device disconnected. Scan again to reconnect.', 'warn');
-    } else if (mode === 'guest') {
+      else setStatus($('room-status'), linkCount() + ' device' + (linkCount() === 1 ? '' : 's') + ' connected', 'go');
+    } else if (mode === 'guest' && guestLink === link) {
       guestLink = null;
-      setStatus($('join-status'), 'Disconnected from ' + link.name + '.', 'warn');
+      if (!link.rejected) setStatus($('join-status'), link.ready ? 'Disconnected from ' + link.name + '.' : 'The other device closed the connection.', 'warn');
       $('join-form').classList.remove('hidden');
       $('leave-btn').classList.add('hidden');
+      $('route-note').textContent = '';
     }
   }
 
@@ -556,10 +439,12 @@
     if (typeof d === 'string') {
       var msg;
       try { msg = JSON.parse(d); } catch (e) { return; }
-      handleControl(link, msg);
+      if (msg && typeof msg === 'object') handleControl(link, msg);
       return;
     }
-    var buf = d instanceof ArrayBuffer ? d : (d && d.buffer ? d.buffer : null);
+    var buf = null;
+    if (d instanceof ArrayBuffer) buf = d;
+    else if (d && ArrayBuffer.isView(d)) buf = (d.byteOffset === 0 && d.byteLength === d.buffer.byteLength) ? d.buffer : d.buffer.slice(d.byteOffset, d.byteOffset + d.byteLength);
     if (!buf || !link.incoming) return;
     var inc = link.incoming;
     inc.received += buf.byteLength;
@@ -570,69 +455,66 @@
     } else {
       inc.parts.push(buf);
     }
-    inc.row.setProgress(inc.received, inc.size);
-    inc.row.setState(inc.meter.update(inc.received));
+    inc.row.setProgress(inc.received, inc.size, inc.meter.update(inc.received));
   }
 
   function handleControl(link, msg) {
     switch (msg.type) {
       case 'hello': onHello(link, msg); break;
-      case 'welcome':
-        link.name = msg.name || 'Host'; link.ready = true;
-        setStatus($('join-status'), 'Connected to ' + link.name + '.', 'go');
-        $('join-form').classList.add('hidden'); $('pin-form').classList.add('hidden');
-        $('leave-btn').classList.remove('hidden');
-        $('send').classList.remove('hidden'); $('recv').classList.remove('hidden');
-        try { history.replaceState(null, '', location.pathname); } catch (e) { /* ignore */ }
-        pumpLink(link);
-        break;
+      case 'welcome': onWelcome(link, msg); break;
       case 'pin-required':
+        if (mode !== 'guest') return;
         setStatus($('join-status'), 'PIN required', 'warn');
         $('join-form').classList.add('hidden'); $('pin-form').classList.remove('hidden');
         $('pin-input').value = ''; $('pin-input').focus();
         break;
       case 'reject':
+        if (mode !== 'guest') return;
         setStatus($('join-status'), msg.reason === 'locked' ? 'That room is locked and not accepting new devices.' : 'Wrong PIN. Try again.', 'warn');
         if (msg.reason === 'pin') { $('pin-form').classList.remove('hidden'); $('pin-input').value = ''; $('pin-input').focus(); }
-        else { $('join-form').classList.remove('hidden'); $('pin-form').classList.add('hidden'); link.conn.close(); }
+        else { link.rejected = true; $('join-form').classList.remove('hidden'); $('pin-form').classList.add('hidden'); link.conn.close(); }
         break;
-      case 'text': onText(link, msg); break;
-      case 'meta': onMeta(link, msg); break;
+      case 'text': if (link.ready) onText(link, msg); break;
+      case 'meta': if (link.ready) onMeta(link, msg); break;
       case 'accept': onAccept(link, msg); break;
       case 'decline':
-        if (link.sending && link.sending.id === msg.id) { link.sending.row.setState('Declined by ' + link.name, 'warn'); link.sending.row.clearActions(); link.sending = null; pumpLink(link); }
+        if (link.sending && link.sending.id === msg.id) { var dit = link.sending; dit.row.setState('Declined by ' + link.name, 'warn'); addRetry(dit); delete link.sentById[dit.id]; link.sending = null; updateActivity(); pumpLink(link); }
         break;
       case 'end': onEnd(link, msg); break;
       case 'cancel':
-        if (link.sending && link.sending.id === msg.id) { link.sending.cancelled = true; link.sending.row.setState('Cancelled by ' + link.name, 'warn'); link.sending.row.clearActions(); }
-        if (link.incoming && link.incoming.id === msg.id) { link.incoming.row.setState('Cancelled by ' + link.name, 'warn'); link.incoming.row.clearActions(); abortIncoming(link.incoming); link.incoming = null; }
+        if (link.sending && link.sending.id === msg.id) { link.sending.cancelled = true; link.sending.row.setState('Cancelled by ' + link.name, 'warn'); link.sending.row.clearActions(); addRetry(link.sending); }
+        if (link.incoming && link.incoming.id === msg.id) { link.incoming.row.setState('Cancelled by ' + link.name, 'warn'); link.incoming.row.clearActions(); abortIncoming(link.incoming); link.incoming = null; updateActivity(); }
+        if (link.pending[msg.id]) { link.pending[msg.id].row.setState('Cancelled by ' + link.name, 'warn'); link.pending[msg.id].row.clearActions(); delete link.pending[msg.id]; }
         break;
       case 'pause':
         if (link.incoming && link.incoming.id === msg.id) link.incoming.row.setState(msg.paused ? 'Paused by ' + link.name : 'Receiving');
         break;
       case 'ack':
-        var it = link.sentById && link.sentById[msg.id];
-        if (it) { it.row.setState(msg.ok === false ? 'Delivered, but checksum did not match' : 'Delivered to ' + link.name, msg.ok === false ? 'warn' : 'go'); }
+        var it = link.sentById[msg.id];
+        if (it) {
+          it.row.setState(msg.ok === false ? 'Delivered, but checksum did not match' : 'Delivered to ' + link.name, msg.ok === false ? 'warn' : 'go');
+          if (msg.ok === false) addRetry(it);
+          delete link.sentById[msg.id];
+        }
         break;
-      case 'rename': link.name = msg.name || link.name; renderDevices(); break;
+      case 'rename': link.name = String(msg.name || link.name).slice(0, 40); renderDevices(); break;
     }
   }
 
   // ---- Handshake ----
   function onHello(link, msg) {
     if (mode !== 'host') return;
-    if (roomLocked) { sendJson(link, { type: 'reject', reason: 'locked' }); setTimeout(function () { link.conn.close(); }, 300); return; }
+    if (roomLocked && !link.ready) { sendJson(link, { type: 'reject', reason: 'locked' }); setTimeout(function () { link.conn.close(); }, 300); return; }
     var finish = function () {
-      link.name = (msg.name || 'Device').slice(0, 40);
+      link.name = String(msg.name || 'Device').slice(0, 40);
       link.ready = true;
-      sendJson(link, { type: 'welcome', name: settings.name });
+      sendJson(link, { type: 'welcome', name: myName() });
       setStatus($('room-status'), link.name + ' connected', 'go');
       renderDevices();
       toast(link.name + ' joined');
-      if (unassigned.length) {
-        unassigned.forEach(function (it) { it.link = link; it.row.setSub('to ' + link.name); link.queue.push(it); });
-        unassigned = [];
-      }
+      chime();
+      flushUnassigned(link);
+      detectRoute(link);
       pumpLink(link);
     };
     if (!roomPin) { finish(); return; }
@@ -642,9 +524,54 @@
     });
   }
 
+  function onWelcome(link, msg) {
+    if (mode !== 'guest') return;
+    link.name = String(msg.name || 'Host').slice(0, 40); link.ready = true;
+    setStatus($('join-status'), 'Connected to ' + link.name + '.', 'go');
+    $('join-form').classList.add('hidden'); $('pin-form').classList.add('hidden');
+    $('leave-btn').classList.remove('hidden');
+    $('send').classList.remove('hidden'); $('recv').classList.remove('hidden');
+    $('lede').textContent = 'Connected. Send files either way.';
+    try { history.replaceState(null, '', location.pathname); } catch (e) { /* ignore */ }
+    flushUnassigned(link);
+    detectRoute(link);
+    pumpLink(link);
+  }
+
   function sendHello(link, pin) {
-    var send = function (hash) { sendJson(link, { type: 'hello', name: settings.name, pin: hash }); };
+    var send = function (hash) { sendJson(link, { type: 'hello', name: myName(), pin: hash }); };
     if (pin) sha256(roomId + ':' + pin).then(send); else send(null);
+  }
+
+  function flushUnassigned(link) {
+    if (!unassigned.length) return;
+    unassigned.forEach(function (it) { it.link = link; it.row.setSub('to ' + link.name); link.queue.push(it); });
+    unassigned = [];
+  }
+
+  // Direct or relayed? Ask the peer connection for its selected candidate pair.
+  function detectRoute(link, attempt) {
+    attempt = attempt || 0;
+    var pc = link.conn && link.conn.peerConnection;
+    if (!pc || !pc.getStats) return;
+    pc.getStats().then(function (report) {
+      var pairs = {}, cands = {}, sel = null;
+      report.forEach(function (r) {
+        if (r.type === 'candidate-pair') pairs[r.id] = r;
+        else if (r.type === 'local-candidate' || r.type === 'remote-candidate') cands[r.id] = r;
+      });
+      report.forEach(function (r) { if (r.type === 'transport' && r.selectedCandidatePairId && pairs[r.selectedCandidatePairId]) sel = pairs[r.selectedCandidatePairId]; });
+      if (!sel) for (var k in pairs) if (pairs[k].state === 'succeeded' && (pairs[k].nominated || pairs[k].selected)) { sel = pairs[k]; break; }
+      if (!sel) { if (attempt < 5) setTimeout(function () { detectRoute(link, attempt + 1); }, 1500); return; }
+      var l = cands[sel.localCandidateId], r = cands[sel.remoteCandidateId];
+      var lt = l && l.candidateType, rt = r && r.candidateType;
+      link.route = (lt === 'relay' || rt === 'relay') ? 'relay' : (lt === 'host' && rt === 'host') ? 'local' : 'direct';
+      renderDevices();
+      if (mode === 'guest') $('route-note').textContent = routeLabel(link.route);
+    }).catch(function () {});
+  }
+  function routeLabel(route) {
+    return route === 'relay' ? 'via relay server' : route === 'local' ? 'direct, same network' : route === 'direct' ? 'direct connection' : '';
   }
 
   // -------------------------------------------------------------------
@@ -671,16 +598,31 @@
         unassigned.push(it);
         return;
       }
-      ts.forEach(function (link) {
-        var row = fileRow($('out-list'), e.path || e.file.name, 'to ' + link.name, e.file.size);
-        row.setState('Queued');
-        var it = { id: nextId(), file: e.file, name: e.file.name, path: e.path || '', link: link, row: row };
-        addSenderControls(it);
-        link.queue.push(it);
-        pumpLink(link);
-      });
+      ts.forEach(function (link) { queueFile(link, e.file, e.path || ''); });
     });
+    $('out-tools').classList.remove('hidden');
     if (!ts.length) toast(entries.length + ' file' + (entries.length === 1 ? '' : 's') + ' queued until a device connects');
+  }
+
+  function queueFile(link, file, path) {
+    var row = fileRow($('out-list'), path || file.name, 'to ' + link.name, file.size);
+    row.setState('Queued');
+    var it = { id: nextId(), file: file, name: file.name, path: path, link: link, row: row };
+    addSenderControls(it);
+    link.queue.push(it);
+    pumpLink(link);
+    return it;
+  }
+
+  function addRetry(it) {
+    if (!it.file) return;
+    it.row.clearActions();
+    it.row.button('Send again', '', function () {
+      var ts = it.link && links[it.link.id] ? [it.link] : targets();
+      if (!ts.length) { toast('No device connected'); return; }
+      it.row.li.remove();
+      ts.forEach(function (link) { queueFile(link, it.file, it.path); });
+    });
   }
 
   function addSenderControls(it) {
@@ -689,17 +631,18 @@
       it.paused = !it.paused;
       it.pauseBtn.textContent = it.paused ? 'Resume' : 'Pause';
       if (it.link) sendJson(it.link, { type: 'pause', id: it.id, paused: it.paused });
-      if (!it.paused && it.pump) it.pump();
+      if (it.paused) it.row.setState('Paused'); else if (it.pump) it.pump();
     });
     it.row.button('Cancel', 'danger', function () {
       it.cancelled = true;
       it.row.setState('Cancelled', 'warn');
       it.row.clearActions();
+      addRetry(it);
       if (it.link) {
-        sendJson(it.link, { type: 'cancel', id: it.id });
+        if (it.link.sending === it || it.link.sentById[it.id]) sendJson(it.link, { type: 'cancel', id: it.id });
         var qi = it.link.queue.indexOf(it);
         if (qi >= 0) it.link.queue.splice(qi, 1);
-        if (it.link.sending === it) { it.link.sending = null; pumpLink(it.link); }
+        if (it.link.sending === it) { it.link.sending = null; updateActivity(); pumpLink(it.link); }
       } else {
         var ui = unassigned.indexOf(it);
         if (ui >= 0) unassigned.splice(ui, 1);
@@ -712,10 +655,20 @@
     var it = link.queue.shift();
     if (it.cancelled) { pumpLink(link); return; }
     link.sending = it;
-    link.sentById = link.sentById || {};
     link.sentById[it.id] = it;
+    updateActivity();
     it.row.setState('Waiting for ' + link.name + ' to accept');
-    sendJson(link, { type: 'meta', id: it.id, name: it.name, path: it.path, size: it.file.size, mime: it.file.type });
+    sendJson(link, { type: 'meta', id: it.id, name: it.name, path: it.path, size: it.file.size, mime: guessMime(it.name, it.file.type) });
+  }
+
+  function waitDrain(dc, cb) {
+    var done = false;
+    var fire = function () { if (done) return; done = true; clearTimeout(t); if (dc) dc.removeEventListener('bufferedamountlow', fire); cb(); };
+    var t = setTimeout(fire, 250);
+    if (dc && 'bufferedAmountLowThreshold' in dc) {
+      dc.bufferedAmountLowThreshold = LOW_WATER;
+      dc.addEventListener('bufferedamountlow', fire);
+    }
   }
 
   function onAccept(link, msg) {
@@ -726,93 +679,128 @@
     var chunk = settings.chunk;
     it.row.setState('Sending');
     function pump() {
-      if (it.cancelled) { link.sending = null; pumpLink(link); return; }
-      if (!link.conn.open) { it.row.setState('Stopped: disconnected', 'warn'); link.sending = null; return; }
+      if (it.cancelled) { link.sending = null; updateActivity(); pumpLink(link); return; }
+      if (!link.conn.open) { it.row.setState('Stopped: disconnected', 'warn'); addRetry(it); link.sending = null; updateActivity(); return; }
       if (it.paused) return;
-      if (dc && dc.bufferedAmount > HIGH_WATER) { setTimeout(pump, 30); return; }
+      if (dc && dc.bufferedAmount > HIGH_WATER) { waitDrain(dc, pump); return; }
       if (offset >= file.size) {
         sendJson(link, { type: 'end', id: it.id, crc: crcFinal(crc) });
         it.row.setProgress(1, 1);
         it.row.setState('Sent, waiting for confirmation');
         it.row.clearActions();
-        stats.sent += file.size; stats.filesSent++; renderStats();
+        stats.sent += file.size; stats.filesSent++; renderStats(); renderDevices();
         link.sending = null;
+        updateActivity();
         pumpLink(link);
         return;
       }
       file.slice(offset, offset + chunk).arrayBuffer().then(function (buf) {
-        if (it.cancelled) { link.sending = null; pumpLink(link); return; }
+        if (it.cancelled) { link.sending = null; updateActivity(); pumpLink(link); return; }
+        if (!link.conn.open) { pump(); return; }
         crc = crcUpdate(crc, buf);
-        link.conn.send(buf);
+        try { link.conn.send(buf); } catch (e) { it.row.setState('Send failed: ' + e.message, 'warn'); addRetry(it); link.sending = null; updateActivity(); pumpLink(link); return; }
         offset += buf.byteLength;
         link.bytesOut += buf.byteLength;
-        it.row.setProgress(offset, file.size);
-        it.row.setState(meter.update(offset));
+        it.row.setProgress(offset, file.size, meter.update(offset));
         pump();
       }, function (err) {
-        it.row.setState('Read error: ' + err.message, 'warn');
+        it.row.setState('Read error: ' + (err && err.message ? err.message : 'the file may have moved'), 'warn');
         sendJson(link, { type: 'cancel', id: it.id });
-        link.sending = null; pumpLink(link);
+        addRetry(it);
+        link.sending = null; updateActivity(); pumpLink(link);
       });
     }
     it.pump = pump;
     pump();
   }
 
-  function sendText() {
-    var text = $('text-input').value;
+  function sendText(text) {
+    text = text == null ? $('text-input').value : text;
     if (!text.trim()) return;
     var ts = targets();
     if (!ts.length) { toast('No device connected yet'); return; }
     ts.forEach(function (link) {
       sendJson(link, { type: 'text', text: text });
-      var row = fileRow($('out-list'), isUrl(text) ? 'Link' : 'Text', 'to ' + link.name, null);
+      var row = fileRow($('out-list'), isUrl(text) ? 'Link' : 'Text', 'to ' + link.name, null, isUrl(text) ? 'link' : 'text');
       row.bar.classList.add('hidden');
       var box = document.createElement('div'); box.className = 'textmsg'; box.textContent = text;
       row.preview.appendChild(box);
       row.setState('Sent', 'go');
       stats.filesSent++; stats.sent += text.length; renderStats();
     });
+    $('out-tools').classList.remove('hidden');
     $('text-input').value = '';
+  }
+
+  function sendClipboard() {
+    if (!navigator.clipboard) { toast('Clipboard not available here'); return; }
+    var fallbackText = function () {
+      return navigator.clipboard.readText().then(function (t) {
+        if (t && t.trim()) sendText(t); else toast('Clipboard is empty');
+      });
+    };
+    var p = navigator.clipboard.read ? navigator.clipboard.read().then(function (items) {
+      var files = [];
+      var chain = Promise.resolve();
+      items.forEach(function (item) {
+        item.types.forEach(function (type) {
+          if (!/^image\//.test(type)) return;
+          chain = chain.then(function () { return item.getType(type); }).then(function (blob) {
+            var ext = type.split('/')[1].replace('jpeg', 'jpg');
+            files.push({ file: new File([blob], 'clipboard-' + Date.now() + '.' + ext, { type: type }), path: '' });
+          });
+        });
+      });
+      return chain.then(function () { if (files.length) addFiles(files); else return fallbackText(); });
+    }) : fallbackText();
+    p.catch(function () { fallbackText().catch(function () { toast('Could not read the clipboard'); }); });
   }
 
   // -------------------------------------------------------------------
   // Receiving
   // -------------------------------------------------------------------
   function onText(link, msg) {
-    var text = String(msg.text || '');
-    var row = fileRow($('in-list'), isUrl(text) ? 'Link' : 'Text', 'from ' + link.name, null);
+    var text = String(msg.text || '').slice(0, 1000000);
+    var url = isUrl(text);
+    var row = fileRow($('in-list'), url ? 'Link' : 'Text', 'from ' + link.name, null, url ? 'link' : 'text');
     row.bar.classList.add('hidden');
     var box = document.createElement('div'); box.className = 'textmsg'; box.textContent = text;
     row.preview.appendChild(box);
     row.setState('Received', 'go');
-    row.button('Copy', '', function () { navigator.clipboard.writeText(text).then(function () { toast('Copied'); }); });
-    if (isUrl(text)) {
-      var a = document.createElement('a'); a.className = 'btn small'; a.href = text.trim(); a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Open';
+    row.button('Copy', 'primary', function () { copyText(text); });
+    if (url) {
+      var a = document.createElement('a'); a.className = 'btn small'; a.href = text.trim(); a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = 'Open';
       row.actions.appendChild(a);
     }
-    row.button('Remove', '', function () { row.li.remove(); refreshRecvButtons(); });
+    row.button('Remove', 'ghost', function () { row.li.remove(); refreshRecvButtons(); });
     stats.filesRecv++; stats.recv += text.length; renderStats();
     refreshRecvButtons();
-    notify('Text from ' + link.name, text.slice(0, 80));
+    notify((url ? 'Link' : 'Text') + ' from ' + link.name, text.slice(0, 80));
+    chime();
   }
 
   function onMeta(link, msg) {
+    if (typeof msg.size !== 'number' || msg.size < 0) { sendJson(link, { type: 'decline', id: msg.id }); return; }
     if (link.incoming) { sendJson(link, { type: 'decline', id: msg.id }); return; }
-    var row = fileRow($('in-list'), msg.path || msg.name, 'from ' + link.name, msg.size);
+    var name = String(msg.name || 'file').replace(/[\\/:*?"<>|]/g, '_').slice(0, 255) || 'file';
+    var path = String(msg.path || '').replace(/\.\.(\/|\\|$)/g, '').replace(/^\/+/, '').slice(0, 1000);
+    var row = fileRow($('in-list'), path || name, 'from ' + link.name, msg.size);
     var inc = {
-      id: msg.id, name: msg.name, path: msg.path || '', size: msg.size, mime: msg.mime || '',
+      id: msg.id, name: name, path: path, size: msg.size, mime: guessMime(name, msg.mime),
       link: link, parts: [], received: 0, crc: -1, row: row, meter: new Meter(msg.size),
       writable: null, writeChain: Promise.resolve()
     };
     refreshRecvButtons();
     var accept = function () {
+      delete link.pending[inc.id];
+      if (link.incoming) { sendJson(link, { type: 'decline', id: inc.id }); row.setState('Declined: another file is still arriving', 'warn'); row.clearActions(); return; }
       link.incoming = inc;
+      updateActivity();
       row.clearActions();
       row.button('Cancel', 'danger', function () {
         sendJson(link, { type: 'cancel', id: inc.id });
         row.setState('Cancelled', 'warn'); row.clearActions();
-        abortIncoming(inc); if (link.incoming === inc) link.incoming = null;
+        abortIncoming(inc); if (link.incoming === inc) { link.incoming = null; updateActivity(); pumpLink(link); }
       });
       var start = function () { row.setState('Receiving'); sendJson(link, { type: 'accept', id: inc.id }); };
       if (dirHandle) {
@@ -823,13 +811,16 @@
       } else start();
     };
     if (settings.autoAccept) { accept(); return; }
+    link.pending[inc.id] = inc;
     row.setState('Incoming file. Accept it?');
     row.button('Accept', 'primary', accept);
     row.button('Decline', '', function () {
+      delete link.pending[inc.id];
       sendJson(link, { type: 'decline', id: inc.id });
       row.setState('Declined', 'warn'); row.clearActions();
     });
-    notify('Incoming file from ' + link.name, msg.name);
+    notify('Incoming file from ' + link.name, name);
+    chime();
   }
 
   function openWritable(inc) {
@@ -852,27 +843,29 @@
 
   function abortIncoming(inc) {
     inc.parts = [];
-    if (inc.writable) { inc.writeChain.then(function () { return inc.writable.abort(); }).catch(function () {}); inc.writable = null; }
+    if (inc.writable) { var w = inc.writable; inc.writeChain.then(function () { return w.abort(); }).catch(function () {}); inc.writable = null; }
   }
 
   function onEnd(link, msg) {
     var inc = link.incoming;
     if (!inc || inc.id !== msg.id) return;
     link.incoming = null;
+    updateActivity();
     var ok = (typeof msg.crc !== 'number') || crcFinal(inc.crc) === msg.crc;
     var complete = inc.received === inc.size;
     inc.row.setProgress(1, 1);
     inc.row.clearActions();
-    stats.recv += inc.received; stats.filesRecv++; renderStats();
+    stats.recv += inc.received; stats.filesRecv++; renderStats(); renderDevices();
     sendJson(link, { type: 'ack', id: inc.id, ok: ok && complete });
     var verdict = !complete ? 'Incomplete (' + fmtBytes(inc.received) + ' of ' + fmtBytes(inc.size) + ')' : ok ? 'Received, checksum verified' : 'Received, but checksum did not match';
     var cls = complete && ok ? 'go' : 'warn';
+    chime();
 
     if (inc.writable) {
       var w = inc.writable;
-      inc.writeChain.then(function () { return w.close(); }).then(function () {
+      inc.writeChain.then(function () { if (inc.writeError) throw inc.writeError; return w.close(); }).then(function () {
         inc.row.setState(verdict + '. Saved as ' + inc.savedName + ' in ' + dirHandle.name, cls);
-      }, function (e) { inc.row.setState('Write failed: ' + e.message, 'warn'); });
+      }, function (e) { inc.row.setState('Write failed: ' + e.message, 'warn'); try { w.abort(); } catch (x) { /* ignore */ } });
       notify('File received', inc.name);
       pumpLink(link);
       return;
@@ -910,13 +903,17 @@
         }).then(function () { toast('Image copied'); }, function () { toast('Could not copy image'); });
       });
     }
-    inc.row.button('Remove', '', function () {
+    if (/^text\/plain/.test(blob.type) && blob.size <= 200 * 1024) {
+      inc.row.button('Copy text', '', function () { blob.text().then(function (t) { copyText(t); }); });
+    }
+    inc.row.button('Remove', 'ghost', function () {
       URL.revokeObjectURL(url);
       var i = received.indexOf(entry); if (i >= 0) received.splice(i, 1);
       inc.row.li.remove(); refreshRecvButtons();
     });
 
     if (settings.preview) addPreview(inc.row, blob, url);
+    if (settings.autoDownload && complete && ok) { a.click(); inc.row.setState(verdict + '. Download started', cls); }
     refreshRecvButtons();
     notify('File received', inc.name);
     pumpLink(link);
@@ -925,20 +922,22 @@
   function pngFromBlob(blob) {
     return new Promise(function (resolve, reject) {
       var img = new Image();
+      var src = URL.createObjectURL(blob);
       img.onload = function () {
         var c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
         c.getContext('2d').drawImage(img, 0, 0);
+        URL.revokeObjectURL(src);
         c.toBlob(function (b) { b ? resolve(b) : reject(new Error('encode failed')); }, 'image/png');
       };
-      img.onerror = reject;
-      img.src = URL.createObjectURL(blob);
+      img.onerror = function () { URL.revokeObjectURL(src); reject(new Error('decode failed')); };
+      img.src = src;
     });
   }
 
   function addPreview(row, blob, url) {
     var t = blob.type;
     if (/^image\//.test(t) && blob.size <= PREVIEW_IMAGE_MAX) {
-      var img = document.createElement('img'); img.src = url; img.alt = ''; row.preview.appendChild(img);
+      var img = document.createElement('img'); img.src = url; img.alt = ''; img.loading = 'lazy'; row.preview.appendChild(img);
     } else if (/^video\//.test(t) && blob.size <= PREVIEW_MEDIA_MAX) {
       var v = document.createElement('video'); v.src = url; v.controls = true; v.playsInline = true; v.preload = 'metadata'; row.preview.appendChild(v);
     } else if (/^audio\//.test(t) && blob.size <= PREVIEW_MEDIA_MAX) {
@@ -953,10 +952,11 @@
   }
 
   function refreshRecvButtons() {
-    var any = $('in-list').children.length > 0;
-    $('recv-empty').classList.toggle('hidden', any);
-    $('clear-recv').classList.toggle('hidden', !any);
+    var n = $('in-list').children.length;
+    $('recv-empty').classList.toggle('hidden', n > 0);
+    $('clear-recv').classList.toggle('hidden', n === 0);
     $('zip-all').classList.toggle('hidden', received.length < 2);
+    $('recv-count').textContent = n ? String(n) : '';
   }
 
   function zipAll() {
@@ -987,41 +987,62 @@
     if (peer) { try { peer.destroy(); } catch (e) { /* ignore */ } }
     peer = null;
     stopScan();
+    updateActivity();
+    $('route-note').textContent = '';
   }
 
-  function createRoom() {
+  function setMode(m) {
+    mode = m;
+    $('mode-host').setAttribute('aria-pressed', m === 'host' ? 'true' : 'false');
+    $('mode-join').setAttribute('aria-pressed', m === 'guest' ? 'true' : 'false');
+  }
+
+  function createRoom(rotate) {
     teardown();
-    mode = 'host';
-    roomId = randomId(10);
-    roomPin = settings.pin ? randomPin() : null;
+    setMode('host');
+    var stored = settings.stableCode ? loadRoom() : {};
+    var usingStored = !rotate && /^[a-z0-9]{10}$/.test(stored.id || '');
+    roomId = usingStored ? stored.id : randomId(10);
+    roomPin = settings.pin ? (usingStored && stored.pin ? String(stored.pin) : randomPin()) : null;
+    if (settings.stableCode) saveRoom();
     roomLocked = false;
     $('lock-room').textContent = 'Lock room';
     $('room').classList.remove('hidden'); $('join').classList.add('hidden');
     $('send').classList.remove('hidden'); $('recv').classList.remove('hidden');
-    $('lede').textContent = 'Scan the code with another device to connect. Then send files either way.';
+    $('lede').textContent = 'Scan the code with another device, then send files either way.';
     $('qr').innerHTML = '<div class="placeholder">Making your code</div>';
     $('room-code').textContent = ''; $('room-link').textContent = '';
     renderPin(); renderDevices();
-    setStatus($('room-status'), 'Connecting to signaling server');
+    setStatus($('room-status'), 'Connecting to signaling server', 'busy');
     try { history.replaceState(null, '', location.pathname); } catch (e) { /* ignore */ }
 
-    peer = new Peer(roomId, peerOptions());
-    peer.on('open', function () {
+    var thisPeer;
+    try { thisPeer = peer = new Peer(roomId, B.peerOptions(settings)); }
+    catch (e) { setStatus($('room-status'), 'Could not start: ' + e.message, 'warn'); return; }
+    thisPeer.on('open', function () {
+      if (peer !== thisPeer) return;
       var url = location.origin + location.pathname + '#' + roomId;
       $('qr').innerHTML = '';
-      new QRCode($('qr'), { text: url, width: 220, height: 220, colorDark: '#17232e', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+      if (window.QRCode) new QRCode($('qr'), { text: url, width: 220, height: 220, colorDark: '#17232e', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+      else $('qr').innerHTML = '<div class="placeholder">QR library did not load. Type the code below instead.</div>';
       $('room-code').textContent = groupCode(roomId);
       $('room-link').textContent = url;
-      setStatus($('room-status'), 'Scan with a phone camera, or type the code on the other device');
+      $('share-link').classList.toggle('hidden', !navigator.share);
+      setStatus($('room-status'), 'Waiting for a device. Scan with a phone camera or type the code.', 'busy');
     });
-    peer.on('connection', function (c) {
+    thisPeer.on('connection', function (c) {
+      if (peer !== thisPeer) { try { c.close(); } catch (e) { /* ignore */ } return; }
       var link = makeLink(c);
       links[link.id] = link;
-      c.on('open', function () { /* wait for hello */ });
     });
-    peer.on('disconnected', function () { if (peer && !peer.destroyed) peer.reconnect(); });
-    peer.on('error', function (e) {
-      if (e.type === 'unavailable-id') { createRoom(); return; }
+    thisPeer.on('disconnected', function () { if (peer === thisPeer && !thisPeer.destroyed) thisPeer.reconnect(); });
+    thisPeer.on('error', function (e) {
+      if (peer !== thisPeer) return;
+      if (e.type === 'unavailable-id') {
+        if (usingStored) toast('Your usual code is in use by another tab, using a fresh one');
+        createRoom(true);
+        return;
+      }
       setStatus($('room-status'), 'Signaling error: ' + e.type + '. Check your connection or the server in Settings, then make a new code.', 'warn');
     });
   }
@@ -1039,8 +1060,11 @@
     $('devices').classList.toggle('hidden', ready.length === 0);
     ready.forEach(function (link) {
       var chip = document.createElement('span'); chip.className = 'chip';
-      var dot = document.createElement('span'); dot.className = 'dot'; chip.appendChild(dot);
-      chip.appendChild(document.createTextNode(link.name + ' (' + fmtBytes(link.bytesIn + link.bytesOut) + ')'));
+      var dot = document.createElement('span'); dot.className = 'dot' + (link.route === 'relay' ? ' relay' : ''); chip.appendChild(dot);
+      chip.appendChild(document.createTextNode(link.name));
+      var sub = document.createElement('span'); sub.className = 'sub';
+      sub.textContent = fmtBytes(link.bytesIn + link.bytesOut) + (link.route ? ', ' + routeLabel(link.route) : '');
+      chip.appendChild(sub);
       var b = document.createElement('button'); b.type = 'button'; b.textContent = 'Disconnect';
       b.addEventListener('click', function () { link.conn.close(); });
       chip.appendChild(b);
@@ -1055,13 +1079,14 @@
       $('target-wrap').classList.add('hidden');
     }
   }
+  setInterval(function () { if (mode === 'host' && activeTransfers()) renderDevices(); }, 2000);
 
   // -------------------------------------------------------------------
   // Guest
   // -------------------------------------------------------------------
   function showJoinForm() {
     teardown();
-    mode = 'guest';
+    setMode('guest');
     $('room').classList.add('hidden'); $('join').classList.remove('hidden');
     $('send').classList.add('hidden'); $('recv').classList.add('hidden');
     $('join-form').classList.remove('hidden'); $('pin-form').classList.add('hidden'); $('leave-btn').classList.add('hidden');
@@ -1074,21 +1099,29 @@
     showJoinForm();
     roomId = code;
     $('join-code').value = groupCode(code);
-    setStatus($('join-status'), 'Connecting to ' + groupCode(code));
+    setStatus($('join-status'), 'Connecting to ' + groupCode(code), 'busy');
     $('lede').textContent = 'Connecting to the other device.';
 
-    peer = new Peer(undefined, peerOptions());
-    peer.on('open', function () {
-      var c = peer.connect(code, { reliable: true, serialization: 'raw' });
+    var thisPeer;
+    try { thisPeer = peer = new Peer(undefined, B.peerOptions(settings)); }
+    catch (e) { setStatus($('join-status'), 'Could not start: ' + e.message, 'warn'); return; }
+    var connectTimer = setTimeout(function () {
+      if (peer === thisPeer && guestLink && !guestLink.ready) setStatus($('join-status'), 'Still connecting. If this takes long, both devices may need a TURN server (Settings > Connection).', 'busy');
+    }, 12000);
+    thisPeer.on('open', function () {
+      if (peer !== thisPeer) return;
+      var c = thisPeer.connect(code, { reliable: true, serialization: 'raw' });
       var link = makeLink(c);
       links[link.id] = link; guestLink = link;
       c.on('open', function () {
-        setStatus($('join-status'), 'Connected, saying hello');
+        setStatus($('join-status'), 'Connected, saying hello', 'busy');
         sendHello(link, null);
       });
     });
-    peer.on('disconnected', function () { if (peer && !peer.destroyed) peer.reconnect(); });
-    peer.on('error', function (e) {
+    thisPeer.on('disconnected', function () { if (peer === thisPeer && !thisPeer.destroyed) thisPeer.reconnect(); });
+    thisPeer.on('error', function (e) {
+      if (peer !== thisPeer) return;
+      clearTimeout(connectTimer);
       if (e.type === 'peer-unavailable') setStatus($('join-status'), 'No room with that code. It may have expired; ask for a new one.', 'warn');
       else setStatus($('join-status'), 'Could not connect: ' + e.type, 'warn');
       $('join-form').classList.remove('hidden');
@@ -1167,12 +1200,9 @@
   // -------------------------------------------------------------------
   // Wiring
   // -------------------------------------------------------------------
-  loadSettings();
-  settingsToForm();
-  $('me-name').textContent = settings.name;
+  $('me-name').textContent = myName();
   renderStats();
-  if (window.showDirectoryPicker) $('folder-setting').classList.remove('hidden');
-  if (settings.notify && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+  if (window.showDirectoryPicker) $('folder-row').classList.remove('hidden');
 
   var drop = $('drop'), picker = $('picker'), folderPicker = $('folder-picker');
   drop.addEventListener('click', function () { picker.click(); });
@@ -1180,40 +1210,72 @@
   picker.addEventListener('change', function () { addFiles(filesFromInput(picker)); picker.value = ''; });
   folderPicker.addEventListener('change', function () { addFiles(filesFromInput(folderPicker)); folderPicker.value = ''; });
   $('pick-folder').addEventListener('click', function () { folderPicker.click(); });
-  ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
-  ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
-  drop.addEventListener('drop', function (e) { collectFromDataTransfer(e.dataTransfer).then(addFiles); });
-  document.addEventListener('dragover', function (e) { e.preventDefault(); });
-  document.addEventListener('drop', function (e) { if (e.target !== drop && !drop.contains(e.target)) { e.preventDefault(); collectFromDataTransfer(e.dataTransfer).then(addFiles); } });
+  $('send-clip').addEventListener('click', sendClipboard);
+
+  // Whole-page drag and drop with an overlay; the drop zone highlights too.
+  var dragDepth = 0;
+  function hasFiles(e) { var t = e.dataTransfer && e.dataTransfer.types; return t && Array.prototype.indexOf.call(t, 'Files') >= 0; }
+  document.addEventListener('dragenter', function (e) { if (!hasFiles(e)) return; e.preventDefault(); dragDepth++; $('drop-overlay').classList.remove('hidden'); drop.classList.add('over'); });
+  document.addEventListener('dragover', function (e) { if (!hasFiles(e)) return; e.preventDefault(); });
+  document.addEventListener('dragleave', function (e) { if (!hasFiles(e)) return; dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) { $('drop-overlay').classList.add('hidden'); drop.classList.remove('over'); } });
+  document.addEventListener('drop', function (e) {
+    if (!hasFiles(e)) return;
+    e.preventDefault(); dragDepth = 0;
+    $('drop-overlay').classList.add('hidden'); drop.classList.remove('over');
+    if ($('send').classList.contains('hidden')) { toast('Connect to a device first'); return; }
+    collectFromDataTransfer(e.dataTransfer).then(addFiles);
+  });
 
   document.addEventListener('paste', function (e) {
-    if (e.target === $('text-input') || /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+    if (/^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+    if ($('send').classList.contains('hidden')) return;
     var files = [];
     var items = e.clipboardData && e.clipboardData.items;
     if (items) for (var i = 0; i < items.length; i++) { if (items[i].kind === 'file') { var f = items[i].getAsFile(); if (f) files.push({ file: f, path: '' }); } }
     if (files.length) { e.preventDefault(); addFiles(files); return; }
     var text = e.clipboardData && e.clipboardData.getData('text');
-    if (text) { $('text-input').value = text; $('text-input').focus(); }
+    if (text) { $('text-input').value = text; $('text-input').focus(); toast('Pasted into the text box. Send it?'); }
   });
 
-  $('send-text').addEventListener('click', sendText);
+  $('send-text').addEventListener('click', function () { sendText(); });
   $('text-input').addEventListener('keydown', function (e) { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); sendText(); } });
+  $('clear-out').addEventListener('click', function () {
+    var lis = $('out-list').children;
+    for (var i = lis.length - 1; i >= 0; i--) {
+      var st = lis[i].querySelector('.fstate');
+      if (/^(go|warn)$/.test((st.className.split(' ')[1] || ''))) lis[i].remove();
+    }
+    if (!$('out-list').children.length) $('out-tools').classList.add('hidden');
+  });
 
   $('copy-link').addEventListener('click', function () {
     var text = $('room-link').textContent; if (!text) return;
-    navigator.clipboard.writeText(text).then(function () { toast('Link copied'); });
+    copyText(text, 'Link copied');
+  });
+  $('room-code').addEventListener('click', function () { if (roomId) copyText(groupCode(roomId), 'Code copied'); });
+  $('share-link').addEventListener('click', function () {
+    var text = $('room-link').textContent; if (!text || !navigator.share) return;
+    navigator.share({ title: 'Join my Beam room', text: 'Open this link to send files to my device', url: text }).catch(function () {});
   });
   $('new-code').addEventListener('click', function () {
     if (activeTransfers() && !confirm('A transfer is running. Making a new code will disconnect everyone. Continue?')) return;
-    createRoom();
+    createRoom(true);
   });
   $('lock-room').addEventListener('click', function () {
     roomLocked = !roomLocked;
     $('lock-room').textContent = roomLocked ? 'Unlock room' : 'Lock room';
     toast(roomLocked ? 'Room locked: no new devices can join' : 'Room unlocked');
   });
-  $('to-join').addEventListener('click', function () { showJoinForm(); $('join-code').focus(); });
-  $('to-host').addEventListener('click', function () { createRoom(); });
+  $('mode-join').addEventListener('click', function () {
+    if (mode === 'guest') return;
+    if (activeTransfers() && !confirm('A transfer is running. Switching will disconnect everyone. Continue?')) return;
+    showJoinForm(); $('join-code').focus();
+  });
+  $('mode-host').addEventListener('click', function () {
+    if (mode === 'host') return;
+    if (activeTransfers() && !confirm('A transfer is running. Switching will disconnect. Continue?')) return;
+    createRoom();
+  });
   $('join-btn').addEventListener('click', function () {
     var code = parseCode($('join-code').value);
     if (!code) { setStatus($('join-status'), 'That does not look like a Beam code (10 letters and digits).', 'warn'); return; }
@@ -1223,11 +1285,31 @@
   $('scan-btn').addEventListener('click', function () { if (scanStream) stopScan(); else startScan(); });
   $('pin-btn').addEventListener('click', function () {
     if (!guestLink) return;
-    setStatus($('join-status'), 'Checking PIN');
-    sendHello(guestLink, $('pin-input').value.trim());
+    var pin = $('pin-input').value.trim();
+    if (!pin) { $('pin-input').focus(); return; }
+    setStatus($('join-status'), 'Checking PIN', 'busy');
+    sendHello(guestLink, pin);
   });
   $('pin-input').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('pin-btn').click(); });
+  $('pin-cancel').addEventListener('click', function () { showJoinForm(); });
   $('leave-btn').addEventListener('click', function () { showJoinForm(); });
+
+  // Big QR modal
+  function openQr() {
+    if (!roomId || !$('room-link').textContent || !window.QRCode) return;
+    $('qr-big').innerHTML = '';
+    var size = Math.min(360, window.innerWidth - 90);
+    new QRCode($('qr-big'), { text: $('room-link').textContent, width: size, height: size, colorDark: '#17232e', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+    $('qr-big-code').textContent = groupCode(roomId) + (roomPin ? '  PIN ' + roomPin : '');
+    $('qr-modal').classList.remove('hidden');
+    $('qr-modal-close').focus();
+  }
+  function closeQr() { $('qr-modal').classList.add('hidden'); }
+  $('qr').addEventListener('click', openQr);
+  $('qr').addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openQr(); } });
+  $('qr-modal-close').addEventListener('click', closeQr);
+  $('qr-modal').addEventListener('click', function (e) { if (e.target === $('qr-modal')) closeQr(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeQr(); });
 
   $('zip-all').addEventListener('click', zipAll);
   $('clear-recv').addEventListener('click', function () {
@@ -1235,30 +1317,20 @@
     received = []; $('in-list').innerHTML = ''; refreshRecvButtons();
   });
 
-  $('settings-btn').addEventListener('click', function () { settingsToForm(); $('settings').classList.toggle('hidden'); });
-  $('close-settings').addEventListener('click', function () { $('settings').classList.add('hidden'); });
-  $('save-settings').addEventListener('click', function () {
-    var oldName = settings.name;
-    formToSettings();
-    if (settings.name !== oldName) for (var k in links) sendJson(links[k], { type: 'rename', name: settings.name });
-    $('settings').classList.add('hidden');
-    toast('Settings saved');
-  });
-  $('reset-settings').addEventListener('click', function () {
-    settings = {}; for (var k in DEFAULTS) settings[k] = DEFAULTS[k];
-    persistSettings(); settingsToForm(); toast('Settings reset');
-  });
   $('set-folder').addEventListener('click', function () {
     window.showDirectoryPicker({ mode: 'readwrite' }).then(function (h) {
       dirHandle = h;
-      $('folder-name').textContent = 'Saving into ' + h.name;
+      $('folder-note').textContent = 'Received files stream straight into "' + h.name + '" with no memory limit.';
+      $('folder-note').classList.remove('hidden');
       $('clear-folder').classList.remove('hidden');
+      $('set-folder').textContent = 'Change folder';
     }, function () {});
   });
   $('clear-folder').addEventListener('click', function () {
     dirHandle = null;
-    $('folder-name').textContent = 'Not set. Files are kept in memory until you tap Save.';
+    $('folder-note').classList.add('hidden');
     $('clear-folder').classList.add('hidden');
+    $('set-folder').textContent = 'Save straight to a folder';
   });
 
   window.addEventListener('beforeunload', function (e) {
@@ -1271,6 +1343,12 @@
   });
 
   // Start
+  if (!window.Peer) {
+    setMode('host');
+    $('room').classList.remove('hidden');
+    setStatus($('room-status'), 'The PeerJS library did not load. Check your connection and reload.', 'warn');
+    return;
+  }
   var startCode = parseCode(location.hash);
   if (startCode) joinRoom(startCode); else createRoom();
 })();

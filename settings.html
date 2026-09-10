@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f3f5f2">
+<title>Settings - Beam</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="beam.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231f7a55'/%3E%3Cpath d='M9 16h14M17 10l6 6-6 6' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
+<script src="common.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js" defer></script>
+</head>
+<body>
+<main>
+  <header class="top">
+    <a class="brand" href="./" aria-label="Back to Beam">
+      <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></span>
+      <span><h1>Settings</h1><small>Beam</small></span>
+    </a>
+    <div class="top-actions">
+      <span class="save-state" id="save-state" aria-live="polite"></span>
+      <a class="btn" href="./">Done</a>
+    </div>
+  </header>
+
+  <nav class="settings-nav" aria-label="Sections">
+    <a href="#device">Device</a>
+    <a href="#room">Room</a>
+    <a href="#receiving">Receiving</a>
+    <a href="#transfer">Transfer</a>
+    <a href="#connection">Connection</a>
+    <a href="#data">Backup</a>
+  </nav>
+
+  <section class="panel section" id="device">
+    <h2>Device</h2>
+    <label class="field"><span>Device name</span>
+      <input type="text" id="set-name" maxlength="40" autocomplete="off">
+      <small id="name-hint">Shown to other devices. Leave blank to use the automatic name.</small>
+    </label>
+    <label class="field"><span>Appearance</span></label>
+    <div class="radio-cards" role="radiogroup" aria-label="Appearance">
+      <label><input type="radio" name="theme" value="system"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>System</label>
+      <label><input type="radio" name="theme" value="light"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Light</label>
+      <label><input type="radio" name="theme" value="dark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>Dark</label>
+    </div>
+  </section>
+
+  <section class="panel section" id="room">
+    <h2>Room</h2>
+    <label class="switch-row">
+      <span class="text"><b>Require a PIN to join</b><small>A 4-digit PIN is shown next to the QR code and is never part of the link.</small></span>
+      <span class="switch"><input type="checkbox" id="set-pin"><i></i></span>
+    </label>
+    <label class="switch-row">
+      <span class="text"><b>Keep the same code on this device</b><small>Reloading the page keeps the room code and QR so saved links stay valid. Use New code on the main page to rotate it.</small></span>
+      <span class="switch"><input type="checkbox" id="set-stable"><i></i></span>
+    </label>
+  </section>
+
+  <section class="panel section" id="receiving">
+    <h2>Receiving</h2>
+    <label class="switch-row">
+      <span class="text"><b>Accept incoming files automatically</b><small>Off means each file waits for you to tap Accept.</small></span>
+      <span class="switch"><input type="checkbox" id="set-auto"><i></i></span>
+    </label>
+    <label class="switch-row">
+      <span class="text"><b>Download received files automatically</b><small>Triggers the browser download as soon as a file finishes. Ignored when a save folder is set.</small></span>
+      <span class="switch"><input type="checkbox" id="set-autodl"><i></i></span>
+    </label>
+    <label class="switch-row">
+      <span class="text"><b>Show previews</b><small>Inline images, video, audio, and small text files.</small></span>
+      <span class="switch"><input type="checkbox" id="set-preview"><i></i></span>
+    </label>
+    <label class="switch-row">
+      <span class="text"><b>Notify me when something arrives</b><small>Browser notification when this tab is in the background.</small></span>
+      <span class="switch"><input type="checkbox" id="set-notify"><i></i></span>
+    </label>
+    <label class="switch-row">
+      <span class="text"><b>Play a sound</b><small>A short chime when a file or message arrives.</small></span>
+      <span class="switch"><input type="checkbox" id="set-sound"><i></i></span>
+    </label>
+  </section>
+
+  <section class="panel section" id="transfer">
+    <h2>Transfer</h2>
+    <label class="field"><span>Chunk size</span>
+      <select id="set-chunk">
+        <option value="16384">16 KB (safest, works everywhere)</option>
+        <option value="32768">32 KB (default)</option>
+        <option value="65536">64 KB (faster)</option>
+        <option value="131072">128 KB (Chromium to Chromium only)</option>
+      </select>
+      <small>Larger chunks are faster but some browser pairs drop messages over 64 KB. If transfers stall, go smaller.</small>
+    </label>
+  </section>
+
+  <section class="panel section" id="connection">
+    <h2>Connection</h2>
+    <p class="note" style="margin-top:0">Leave these blank to use the free public PeerJS signaling server. Only the connection setup goes through it; file data travels device to device.</p>
+    <div class="grid2">
+      <label class="field"><span>Signaling host</span><input type="text" id="set-host" placeholder="0.peerjs.com" autocomplete="off"></label>
+      <label class="field"><span>Port</span><input type="number" id="set-port" placeholder="443" min="1" max="65535"></label>
+      <label class="field"><span>Path</span><input type="text" id="set-path" placeholder="/" autocomplete="off"></label>
+      <label class="field"><span>Key</span><input type="text" id="set-key" placeholder="peerjs" autocomplete="off"></label>
+    </div>
+    <label class="field"><span>TLS</span>
+      <select id="set-secure">
+        <option value="auto">Automatic (match this page)</option>
+        <option value="yes">Always use wss / https</option>
+        <option value="no">Plain ws / http</option>
+      </select>
+    </label>
+    <label class="field"><span>ICE servers (JSON array)</span>
+      <textarea id="set-ice" class="mono" rows="6" spellcheck="false"></textarea>
+      <small>Add a TURN server if devices on different networks cannot connect. Example: <code>{ "urls": "turn:turn.example.com:3478", "username": "u", "credential": "p" }</code></small>
+      <div class="field-error hidden" id="ice-error"></div>
+    </label>
+    <div class="row">
+      <button type="button" id="test-conn">Test signaling server</button>
+      <span class="status" id="test-status"></span>
+    </div>
+    <p class="note">Connection settings take effect the next time a room is created or joined.</p>
+  </section>
+
+  <section class="panel section" id="data">
+    <h2>Backup and reset</h2>
+    <p class="note" style="margin-top:0">Settings live in this browser only. Export them to move to another device.</p>
+    <div class="row">
+      <button type="button" id="export-btn">Export settings</button>
+      <button type="button" id="import-btn">Import settings</button>
+      <input type="file" id="import-file" accept="application/json,.json">
+      <button type="button" id="reset-btn" class="danger">Reset to defaults</button>
+    </div>
+  </section>
+
+  <p class="foot"><a href="./">Back to Beam</a><span>Settings save automatically</span></p>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var B = window.Beam;
+  var settings = B.load();
+  var saveTimer = null;
+
+  function fill() {
+    $('set-name').value = settings.name;
+    $('set-name').placeholder = B.guessDevice();
+    var radios = document.querySelectorAll('input[name="theme"]');
+    for (var i = 0; i < radios.length; i++) radios[i].checked = radios[i].value === settings.theme;
+    $('set-pin').checked = !!settings.pin;
+    $('set-stable').checked = !!settings.stableCode;
+    $('set-auto').checked = !!settings.autoAccept;
+    $('set-autodl').checked = !!settings.autoDownload;
+    $('set-preview').checked = !!settings.preview;
+    $('set-notify').checked = !!settings.notify;
+    $('set-sound').checked = !!settings.sound;
+    $('set-chunk').value = String(settings.chunk);
+    $('set-host').value = settings.host; $('set-port').value = settings.port;
+    $('set-path').value = settings.path; $('set-key').value = settings.key;
+    $('set-secure').value = settings.secure;
+    $('set-ice').value = settings.ice;
+    validateIce();
+    B.applyTheme(settings.theme);
+  }
+
+  function validateIce() {
+    var err = $('ice-error');
+    try {
+      var v = JSON.parse($('set-ice').value);
+      if (!Array.isArray(v)) throw new Error('must be a JSON array, e.g. [ { "urls": "stun:..." } ]');
+      err.classList.add('hidden'); err.textContent = '';
+      return true;
+    } catch (e) {
+      err.textContent = 'Not valid: ' + e.message + '. The previous value is kept until this is fixed.';
+      err.classList.remove('hidden');
+      return false;
+    }
+  }
+
+  function collect() {
+    settings.name = $('set-name').value.trim().slice(0, 40);
+    var t = document.querySelector('input[name="theme"]:checked');
+    settings.theme = t ? t.value : 'system';
+    settings.pin = $('set-pin').checked;
+    settings.stableCode = $('set-stable').checked;
+    settings.autoAccept = $('set-auto').checked;
+    settings.autoDownload = $('set-autodl').checked;
+    settings.preview = $('set-preview').checked;
+    settings.notify = $('set-notify').checked;
+    settings.sound = $('set-sound').checked;
+    settings.chunk = parseInt($('set-chunk').value, 10) || 32768;
+    settings.host = $('set-host').value.trim();
+    settings.port = $('set-port').value.trim();
+    settings.path = $('set-path').value.trim();
+    settings.key = $('set-key').value.trim();
+    settings.secure = $('set-secure').value;
+    if (validateIce()) settings.ice = $('set-ice').value;
+  }
+
+  function flash(text, cls) {
+    var s = $('save-state');
+    s.textContent = text; s.className = 'save-state' + (cls ? ' ' + cls : '');
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () { s.textContent = ''; s.className = 'save-state'; }, 1800);
+  }
+
+  function persist() {
+    collect();
+    B.applyTheme(settings.theme);
+    if (B.save(settings)) flash('Saved', 'go'); else flash('Could not save (storage blocked)', 'warn');
+  }
+
+  // Save on every change. Text fields also save on input after a short pause.
+  var inputs = document.querySelectorAll('input, select, textarea');
+  var debounce = null;
+  for (var i = 0; i < inputs.length; i++) {
+    if (inputs[i].id === 'import-file') continue;
+    inputs[i].addEventListener('change', persist);
+    if (inputs[i].type === 'text' || inputs[i].type === 'number' || inputs[i].tagName === 'TEXTAREA') {
+      inputs[i].addEventListener('input', function () { clearTimeout(debounce); debounce = setTimeout(persist, 500); });
+    }
+  }
+
+  $('set-notify').addEventListener('change', function () {
+    if (!this.checked) return;
+    if (!('Notification' in window)) { B.toast('This browser does not support notifications'); return; }
+    if (Notification.permission === 'default') {
+      Notification.requestPermission().then(function (p) { if (p !== 'granted') B.toast('Notifications were not allowed by the browser'); });
+    } else if (Notification.permission === 'denied') {
+      B.toast('Notifications are blocked for this site in the browser settings');
+    }
+  });
+
+  $('set-sound').addEventListener('change', function () { if (this.checked) B.chime(); });
+
+  // Test the signaling server.
+  var testPeer = null;
+  $('test-conn').addEventListener('click', function () {
+    if (!window.Peer) { setTest('PeerJS library did not load', 'warn'); return; }
+    collect();
+    if (testPeer) { try { testPeer.destroy(); } catch (e) { /* ignore */ } }
+    setTest('Connecting', 'busy');
+    var done = false;
+    var timer = setTimeout(function () { if (!done) { done = true; setTest('No answer after 10 seconds. Check host, port, path, and TLS.', 'warn'); try { testPeer.destroy(); } catch (e) { /* ignore */ } } }, 10000);
+    try {
+      testPeer = new Peer(undefined, B.peerOptions(settings));
+    } catch (e) { clearTimeout(timer); setTest('Could not start: ' + e.message, 'warn'); return; }
+    testPeer.on('open', function (id) {
+      if (done) return; done = true; clearTimeout(timer);
+      setTest('Signaling server reachable (id ' + id.slice(0, 8) + ')', 'go');
+      setTimeout(function () { try { testPeer.destroy(); } catch (e) { /* ignore */ } }, 500);
+    });
+    testPeer.on('error', function (e) {
+      if (done) return; done = true; clearTimeout(timer);
+      setTest('Failed: ' + (e.type || e.message || 'unknown error'), 'warn');
+    });
+  });
+  function setTest(text, cls) { var s = $('test-status'); s.textContent = text; s.className = 'status' + (cls ? ' ' + cls : ''); }
+
+  // Export / import / reset
+  $('export-btn').addEventListener('click', function () {
+    collect();
+    var blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'beam-settings.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 10000);
+  });
+  $('import-btn').addEventListener('click', function () { $('import-file').click(); });
+  $('import-file').addEventListener('change', function () {
+    var f = this.files[0]; this.value = ''; if (!f) return;
+    f.text().then(function (txt) {
+      var obj = JSON.parse(txt);
+      if (!obj || typeof obj !== 'object') throw new Error('not an object');
+      for (var k in B.DEFAULTS) if (k in obj) settings[k] = obj[k];
+      if (typeof settings.ice !== 'string') settings.ice = JSON.stringify(settings.ice, null, 2);
+      B.save(settings); fill(); flash('Imported', 'go'); B.toast('Settings imported');
+    }).catch(function (e) { B.toast('Could not import: ' + e.message); });
+  });
+  $('reset-btn').addEventListener('click', function () {
+    if (!confirm('Reset all settings to their defaults?')) return;
+    settings = {}; for (var k in B.DEFAULTS) settings[k] = B.DEFAULTS[k];
+    B.save(settings); fill(); flash('Reset', 'go');
+  });
+
+  // Keep in sync if another tab changes settings.
+  window.addEventListener('storage', function (e) { if (e.key === B.STORAGE_KEY) { settings = B.load(); fill(); } });
+
+  fill();
+})();
+</script>
+</body>
+</html>
