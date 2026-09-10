@@ -5,6 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#f3f5f2">
 <meta name="description" content="Send files and text between your devices, browser to browser, by scanning a QR code.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Beam">
+<meta property="og:title" content="Beam - share files between devices">
+<meta property="og:description" content="Send files and text between your devices, browser to browser. Scan a code, drop a file. No accounts, no uploads.">
+<meta property="og:url" content="https://londopy.github.io/beam/">
+<meta property="og:image" content="https://londopy.github.io/beam/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Beam: send files between your devices, browser to browser">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Beam - share files between devices">
+<meta name="twitter:description" content="Send files and text between your devices, browser to browser. Scan a code, drop a file.">
+<meta name="twitter:image" content="https://londopy.github.io/beam/og.png">
 <title>Beam - share files between devices</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
@@ -94,6 +107,7 @@
       </label>
       <div class="row"><button type="button" class="primary" id="pin-btn">Unlock</button><button type="button" id="pin-cancel">Cancel</button></div>
     </div>
+    <p class="note">Trouble connecting? <a href="settings.html#diag">Run the connection check</a> to scan for VPNs, firewalls, and blocked servers.</p>
     <div class="row" id="join-connected">
       <button type="button" id="leave-btn" class="hidden">Leave</button>
     </div>
@@ -425,7 +439,7 @@
     conn.on('error', function (e) { console.warn('link error', e); if (!link.ready) connectFailed(link, 'Connection error: ' + (e && e.message ? e.message : e)); });
     conn.on('iceStateChanged', function (state) {
       if (state === 'failed') {
-        if (!link.ready) connectFailed(link, 'The two devices could not reach each other directly, and the relay did not help either. Try the same Wi-Fi, or add a TURN server under Settings > Connection.');
+        if (!link.ready) connectFailed(link, 'The two devices could not reach each other directly, and the relay did not help either. Try the same Wi-Fi, or run the connection check in Settings to see what is blocking it.');
         else if (mode === 'guest') setStatus($('join-status'), 'Connection to ' + link.name + ' lost.', 'warn');
       } else if (state === 'connected' || state === 'completed') {
         if (link.ready) detectRoute(link);
@@ -1057,7 +1071,7 @@
     catch (e) { setStatus($('room-status'), 'Could not start: ' + e.message, 'warn'); return; }
     var hostOpened = false;
     setTimeout(function () {
-      if (peer === thisPeer && !hostOpened) setStatus($('room-status'), 'Cannot reach the signaling server (0.peerjs.com). An ad blocker, VPN, or firewall may be blocking it. Check Settings > Connection > Test.', 'warn');
+      if (peer === thisPeer && !hostOpened) setStatus($('room-status'), 'Cannot reach the signaling server (0.peerjs.com). An ad blocker, VPN, or firewall may be blocking it. Run the connection check in Settings.', 'warn');
     }, 10000);
     thisPeer.on('open', function () {
       if (peer !== thisPeer) return;
@@ -1150,7 +1164,7 @@
     var opened = false;
     var signalTimer = setTimeout(function () {
       if (peer === thisPeer && !opened) {
-        setStatus($('join-status'), 'Cannot reach the signaling server (0.peerjs.com). An ad blocker, VPN, or firewall may be blocking it. Check Settings > Connection > Test.', 'warn');
+        setStatus($('join-status'), 'Cannot reach the signaling server (0.peerjs.com). An ad blocker, VPN, or firewall may be blocking it. Run the connection check in Settings.', 'warn');
         $('join-form').classList.remove('hidden');
       }
     }, 10000);

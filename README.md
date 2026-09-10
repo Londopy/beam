@@ -66,6 +66,9 @@ auto-download, previews, notifications, sound.
 TURN servers as JSON.
 * Export and import settings as JSON, reset to defaults. Changes apply to an
 open Beam tab immediately.
+* Connection check: scans for VPNs, blocked UDP, unreachable STUN or TURN,
+symmetric NAT, extensions that disable WebRTC, and runs a real loopback
+connection through the relay. Produces a report you can copy.
 
 ## Deploy to GitHub Pages
 
@@ -150,6 +153,10 @@ servers JSON in Settings, for example:
     common.js                     settings storage and theme, shared
     beam.css                      stylesheet, shared
     topo.js                       contour-line background
+    diag.js                       connection check
+    og.png                        link preview image
+    manifest.webmanifest, sw.js   installable app shell
+    icon.svg, icon-maskable.svg   app icons
     basic/index.html              the original one-way, one-file version
     .github/workflows/pages.yml   GitHub Pages deployment
     .nojekyll                     tells Pages not to run Jekyll

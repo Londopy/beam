@@ -13,6 +13,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231f7a55'/%3E%3Cpath d='M9 16h14M17 10l6 6-6 6' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
 <script src="common.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js" defer></script>
+<script src="diag.js" defer></script>
 </head>
 <body>
 <canvas id="topo" aria-hidden="true"></canvas>
@@ -34,6 +35,7 @@
     <a href="#receiving">Receiving</a>
     <a href="#transfer">Transfer</a>
     <a href="#connection">Connection</a>
+    <a href="#diag">Check</a>
     <a href="#data">Backup</a>
   </nav>
 
@@ -126,6 +128,18 @@
       <span class="status" id="test-status"></span>
     </div>
     <p class="note">Connection settings take effect the next time a room is created or joined.</p>
+  </section>
+
+  <section class="panel section" id="diag">
+    <h2>Connection check</h2>
+    <p class="note" style="margin-top:0">Scans this device for things that stop Beam from connecting: VPNs, blocked UDP, unreachable STUN or TURN servers, extensions that disable WebRTC, strict NAT, and more. Takes about 30 seconds and stays in your browser.</p>
+    <div class="row" style="margin-top:10px">
+      <button type="button" class="primary" id="diag-run">Run connection check</button>
+      <button type="button" id="diag-copy" class="hidden">Copy report</button>
+      <span class="status" id="diag-status"></span>
+    </div>
+    <div class="verdict hidden" id="diag-verdict"></div>
+    <ul class="checks" id="diag-list"></ul>
   </section>
 
   <section class="panel section" id="data">
@@ -290,6 +304,37 @@
     settings = {}; for (var k in B.DEFAULTS) settings[k] = B.DEFAULTS[k];
     B.save(settings); fill(); flash('Reset', 'go');
   });
+
+  // Connection check
+  var lastReport = null;
+  $('diag-run').addEventListener('click', function () {
+    if (!window.BeamDiag) { B.toast('Check script did not load'); return; }
+    collect();
+    var list = $('diag-list'); list.innerHTML = '';
+    $('diag-verdict').classList.add('hidden'); $('diag-copy').classList.add('hidden');
+    $('diag-run').disabled = true;
+    setDiag('Checking', 'busy');
+    var render = function (r) {
+      var li = document.createElement('li'); li.className = 'check ' + r.level;
+      li.innerHTML = '<span class="dot"></span><div class="body"><b></b><span class="d"></span><p class="advice"></p></div>';
+      li.querySelector('b').textContent = r.title;
+      li.querySelector('.d').textContent = r.detail;
+      var ad = li.querySelector('.advice'); if (r.advice) ad.textContent = r.advice; else ad.remove();
+      list.appendChild(li);
+    };
+    BeamDiag.run(settings, render).then(function (out) {
+      lastReport = out;
+      var v = $('diag-verdict'); v.textContent = out.verdict.text; v.className = 'verdict ' + out.verdict.level;
+      setDiag(out.verdict.level === 'ok' ? 'All good' : out.verdict.level === 'warn' ? 'Works with caveats' : 'Problems found', out.verdict.level === 'ok' ? 'go' : 'warn');
+      $('diag-copy').classList.remove('hidden');
+    }).catch(function (e) { setDiag('Check crashed: ' + e.message, 'warn'); }).then(function () { $('diag-run').disabled = false; });
+  });
+  $('diag-copy').addEventListener('click', function () {
+    if (!lastReport) return;
+    navigator.clipboard.writeText(BeamDiag.reportText(lastReport)).then(function () { B.toast('Report copied'); }, function () { B.toast('Could not copy'); });
+  });
+  function setDiag(t, cls) { var s = $('diag-status'); s.textContent = t; s.className = 'status' + (cls ? ' ' + cls : ''); }
+  if (location.hash === '#diag' || /[?&]check\b/.test(location.search)) setTimeout(function () { $('diag-run').click(); }, 300);
 
   // Keep in sync if another tab changes settings.
   window.addEventListener('storage', function (e) { if (e.key === B.STORAGE_KEY) { settings = B.load(); fill(); } });
